@@ -1,0 +1,216 @@
+version: "3.9"
+
+services:
+  frontend:
+    image: nginx:alpine
+    container_name: shopmind-frontend
+    ports:
+      - "3000:80"
+    volumes:
+      - ./services/frontend/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./services/frontend/public:/usr/share/nginx/html:ro
+    networks:
+      - shopmind-net
+    depends_on:
+      - api-gateway
+
+  api-gateway:
+    image: nginx:alpine
+    container_name: shopmind-api-gateway
+    ports:
+      - "80:80"
+    volumes:
+      - ./services/api-gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - shopmind-net
+    depends_on:
+      - auth-service
+      - user-service
+      - order-service
+      - payment-service
+      - inventory-service
+      - notification-service
+      - search-service
+
+  auth-service:
+    image: node:20-alpine
+    container_name: shopmind-auth-service
+    working_dir: /usr/src/app
+    volumes:
+      - ./services/auth-service:/usr/src/app
+    ports:
+      - "3001:3001"
+    command: node server.js
+    environment:
+      - PORT=3001
+      - SERVICE_NAME=auth-service
+      - JAEGER_ENDPOINT=http://jaeger:4318/v1/traces
+    networks:
+      - shopmind-net
+
+  user-service:
+    image: node:20-alpine
+    container_name: shopmind-user-service
+    working_dir: /usr/src/app
+    volumes:
+      - ./services/user-service:/usr/src/app
+    ports:
+      - "3002:3002"
+    command: node server.js
+    environment:
+      - PORT=3002
+      - SERVICE_NAME=user-service
+      - JAEGER_ENDPOINT=http://jaeger:4318/v1/traces
+    networks:
+      - shopmind-net
+
+  order-service:
+    image: node:20-alpine
+    container_name: shopmind-order-service
+    working_dir: /usr/src/app
+    volumes:
+      - ./services/order-service:/usr/src/app
+    ports:
+      - "3003:3003"
+    command: node server.js
+    environment:
+      - PORT=3003
+      - SERVICE_NAME=order-service
+      - JAEGER_ENDPOINT=http://jaeger:4318/v1/traces
+      - PAYMENT_SERVICE_URL=http://payment-service:3004
+      - INVENTORY_SERVICE_URL=http://inventory-service:3005
+    networks:
+      - shopmind-net
+
+  payment-service:
+    image: node:20-alpine
+    container_name: shopmind-payment-service
+    working_dir: /usr/src/app
+    volumes:
+      - ./services/payment-service:/usr/src/app
+    ports:
+      - "3004:3004"
+    command: node server.js
+    environment:
+      - PORT=3004
+      - SERVICE_NAME=payment-service
+      - JAEGER_ENDPOINT=http://jaeger:4318/v1/traces
+      - RAZORPAY_KEY_ID=rzp_test_placeholder_key
+      - RAZORPAY_KEY_SECRET=placeholder_secret
+    networks:
+      - shopmind-net
+
+  inventory-service:
+    image: node:20-alpine
+    container_name: shopmind-inventory-service
+    working_dir: /usr/src/app
+    volumes:
+      - ./services/inventory-service:/usr/src/app
+    ports:
+      - "3005:3005"
+    command: node server.js
+    environment:
+      - PORT=3005
+      - SERVICE_NAME=inventory-service
+      - JAEGER_ENDPOINT=http://jaeger:4318/v1/traces
+    networks:
+      - shopmind-net
+
+  notification-service:
+    image: node:20-alpine
+    container_name: shopmind-notification-service
+    working_dir: /usr/src/app
+    volumes:
+      - ./services/notification-service:/usr/src/app
+    ports:
+      - "3006:3006"
+    command: node server.js
+    environment:
+      - PORT=3006
+      - SERVICE_NAME=notification-service
+      - JAEGER_ENDPOINT=http://jaeger:4318/v1/traces
+    networks:
+      - shopmind-net
+
+  search-service:
+    image: node:20-alpine
+    container_name: shopmind-search-service
+    working_dir: /usr/src/app
+    volumes:
+      - ./services/search-service:/usr/src/app
+    ports:
+      - "3007:3007"
+    command: node server.js
+    environment:
+      - PORT=3007
+      - SERVICE_NAME=search-service
+      - JAEGER_ENDPOINT=http://jaeger:4318/v1/traces
+    networks:
+      - shopmind-net
+
+  cache:
+    image: redis:alpine
+    container_name: shopmind-cache
+    ports:
+      - "6379:6379"
+    networks:
+      - shopmind-net
+
+  postgres-primary:
+    image: postgres:16
+    container_name: shopmind-postgres-primary
+    environment:
+      POSTGRES_PASSWORD: devpass
+      POSTGRES_DB: shopmind
+    ports:
+      - "5432:5432"
+    networks:
+      - shopmind-net
+
+  postgres-replica:
+    image: postgres:16
+    container_name: shopmind-postgres-replica
+    environment:
+      POSTGRES_PASSWORD: devpass
+      POSTGRES_DB: shopmind
+    ports:
+      - "5433:5432"
+    networks:
+      - shopmind-net
+
+  prometheus:
+    image: prom/prometheus
+    container_name: shopmind-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks:
+      - shopmind-net
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: shopmind-jaeger
+    ports:
+      - "16686:16686"
+      - "4318:4318" # OTLP HTTP receiver
+    networks:
+      - shopmind-net
+
+  telemetry-exporter:
+    image: node:20-alpine
+    container_name: shopmind-telemetry-exporter
+    working_dir: /usr/src/app
+    volumes:
+      - ./telemetry-exporter:/usr/src/app
+    environment:
+      - PROMETHEUS_URL=http://prometheus:9090
+      - JAEGER_URL=http://jaeger:16686
+      - EXPORT_PATH=/usr/src/app/adjacency.json
+    command: node exporter.js
+    networks:
+      - shopmind-net
+
+networks:
+  shopmind-net:
+    driver: bridge
