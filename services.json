@@ -1,0 +1,14 @@
+{
+  "frontend":            { "host": "localhost", "port": 3000, "role": "edge" },
+  "api-gateway":         { "host": "localhost", "port": 80,   "role": "edge" },
+  "auth-service":        { "host": "localhost", "port": 3001, "role": "app" },
+  "user-service":        { "host": "localhost", "port": 3002, "role": "app" },
+  "order-service":       { "host": "localhost", "port": 3003, "role": "app" },
+  "payment-service":     { "host": "localhost", "port": 3004, "role": "app" },
+  "inventory-service":   { "host": "localhost", "port": 3005, "role": "app" },
+  "notification-service":{ "host": "localhost", "port": 3006, "role": "app" },
+  "search-service":      { "host": "localhost", "port": 3007, "role": "app" },
+  "cache":               { "host": "localhost", "port": 6379, "role": "infra" },
+  "postgres-primary":    { "host": "localhost", "port": 5432, "role": "infra" },
+  "postgres-replica":    { "host": "localhost", "port": 5433, "role": "infra" }
+}

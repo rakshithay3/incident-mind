@@ -1,0 +1,115 @@
+# GNN Data Contract Specification — ShopMind Sandbox
+
+This document defines the formal data contract interface between the ShopMind telemetry exporter pipeline and the downstream Graph Neural Network (GNN) Root Cause Analysis module.
+
+---
+
+## 1. Output Schema: `adjacency.json`
+
+The GNN expects a single, JSON-formatted dependency graph snapshot representing the state of the 12-service topology.
+
+```json
+{
+  "schema_version": "1.0",
+  "dataset_version": "2026.07",
+  "experiment_id": "expr_test_001",
+  "timestamp": "2026-07-08T14:30:15.123Z",
+  "nodes": [
+    {
+      "service_id": "auth-service",
+      "cpu_pct": 0.42,
+      "mem_pct": 0.61,
+      "error_rate": 0.08,
+      "mean_latency_ms": 120.5,
+      "p99_latency_ms": 480.2,
+      "timestamp": "2026-07-08T14:30:15.123Z"
+    }
+  ],
+  "edges": [
+    {
+      "source": "api-gateway",
+      "target": "auth-service",
+      "call_count": 142,
+      "timestamp": "2026-07-08T14:30:15.123Z"
+    }
+  ],
+  "fault_injection": {
+    "active": true,
+    "fault_type": "network_delay",
+    "target_service": "inventory-service",
+    "injected_at": "2026-07-08T14:29:30.000Z",
+    "scheduled_duration_sec": 30,
+    "auto_rollback": true
+  },
+  "ground_truth_root_cause": "inventory-service"
+}
+```
+
+---
+
+## 2. Field Specifications
+
+### Root Fields
+- **`schema_version`** (string): The structural schema version (currently `"1.0"`).
+- **`dataset_version`** (string): Version string of the current dataset build (e.g. `"2026.07"`).
+- **`experiment_id`** (string): Identifier for the active injection incident.
+- **`timestamp`** (string): ISO 8601 timestamp of the snapshot generation.
+- **`ground_truth_root_cause`** (string): The target service ID representing the actual root cause of the failure. Set to `""` if no fault is active.
+
+### Nodes (`nodes` array)
+Each object in the array represents a service in the topology:
+- **`service_id`** (string): The identifier matching the docker service (e.g. `"inventory-service"`).
+- **`cpu_pct`** (float or null): CPU utilization ratio from $0.0$ to $1.0$ (scaled to single-threaded capacity). Can be `null` if the telemetry scraping request to the microservice fails or times out (indicating the container is unresponsive).
+- **`mem_pct`** (float or null): RSS Memory usage ratio relative to a standard container limit of **512MB** ($0.0$ to $1.0$). Can be `null` if the telemetry scraping request fails or times out.
+- **`error_rate`** (float): Ratio of HTTP error spans (status code $\ge 400$) to total spans over the rolling window ($0.0$ to $1.0$).
+- **`mean_latency_ms`** (float): Mean span execution duration in milliseconds.
+- **`p99_latency_ms`** (float): 99th percentile span execution duration in milliseconds.
+- **`timestamp`** (string): Snapshot collection time.
+
+### Edges (`edges` array)
+Each object represents a service communication link:
+- **`source`** (string): Invoking service.
+- **`target`** (string): Receiver service.
+- **`call_count`** (integer): Frequency of spans along this link over the lookback window.
+- **`timestamp`** (string): Snapshot collection time.
+
+### Fault Metadata (`fault_injection`)
+- **`active`** (boolean): True if an active failure injection is running.
+- **`fault_type`** (string): One of `"cpu_stress"`, `"memory_pressure"`, `"network_delay"`, or `"pod_crash"`.
+- **`target_service`** (string): The microservice ID subjected to the fault.
+- **`injected_at`** (string): ISO 8601 timestamp of failure injection.
+- **`scheduled_duration_sec`** (integer): Time limit in seconds before rollback.
+- **`auto_rollback`** (boolean): True if the fault is programmed to rollback.
+
+---
+
+## 3. Data Validation Report Schema: `validation_report.json`
+
+The validator writes an audit report verifying the health and validity of the telemetry data:
+
+```json
+{
+  "timestamp": "2026-07-08T14:30:20Z",
+  "experiment_id": "expr_test_001",
+  "validation_passed": true,
+  "metrics_validation": {
+    "auth-service": {
+      "cpu_vs_latency_spearman": 0.85,
+      "errors_vs_p99_spearman": 0.91,
+      "metrics_flatlined": false
+    }
+  },
+  "graph_validation": {
+    "total_nodes": 12,
+    "total_edges": 16,
+    "disconnected_nodes": [],
+    "duplicate_nodes": false
+  },
+  "fault_impact_validation": {
+    "fault_active": true,
+    "target_service": "inventory-service",
+    "deviation_detected": true,
+    "details": "inventory-service mean latency (81.49ms) is 56.6x baseline (1.44ms)"
+  }
+}
+```

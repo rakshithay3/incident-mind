@@ -2,7 +2,33 @@
 const http = require('http');
 const url = require('url');
 const crypto = require('crypto');
+const os = require('os');
 const faultInjector = require('./fault-injector');
+
+let lastCpuUsage = process.cpuUsage();
+let lastCpuTime = process.hrtime();
+
+function getCpuUsageRatio() {
+  const elapCpuUsage = process.cpuUsage(lastCpuUsage);
+  const elapTime = process.hrtime(lastCpuTime);
+  
+  lastCpuUsage = process.cpuUsage();
+  lastCpuTime = process.hrtime();
+  
+  const elapTimeMS = elapTime[0] * 1000 + elapTime[1] / 1000000;
+  if (elapTimeMS === 0) return 0.0;
+  const elapUserMS = elapCpuUsage.user / 1000;
+  const elapSystMS = elapCpuUsage.system / 1000;
+  const cpuPercent = (elapUserMS + elapSystMS) / elapTimeMS;
+  
+  return Math.min(1.0, Math.max(0.0, cpuPercent));
+}
+
+function getMemoryUsageRatio() {
+  const rss = process.memoryUsage().rss;
+  const containerLimit = 512 * 1024 * 1024; // 512MB
+  return Math.min(1.0, Math.max(0.0, rss / containerLimit));
+}
 
 const PORT = process.env.PORT || 3003;
 const SERVICE_NAME = process.env.SERVICE_NAME || 'order-service';
@@ -17,7 +43,7 @@ function incMetric(method, route, code) {
 }
 
 // Generate traces to Jaeger (OTLP JSON)
-function sendSpan(name, traceId, spanId, parentSpanId, startTime, durationMs) {
+function sendSpan(name, traceId, spanId, parentSpanId, startTime, durationMs, statusCode = 200) {
   const startTimeUnixNano = BigInt(startTime) * 1000000n;
   const endTimeUnixNano = BigInt(startTime + Math.floor(durationMs)) * 1000000n;
 
@@ -35,7 +61,7 @@ function sendSpan(name, traceId, spanId, parentSpanId, startTime, durationMs) {
           kind: 1, // SPAN_KIND_INTERNAL
           startTimeUnixNano: startTimeUnixNano.toString(),
           endTimeUnixNano: endTimeUnixNano.toString(),
-          status: { code: 1 }
+          status: { code: statusCode >= 400 ? 2 : 1 }
         }]
       }]
     }]
@@ -92,6 +118,10 @@ function callService(serviceUrl, method, payload = {}, traceHeaders = {}) {
       });
     });
 
+    req.setTimeout(1500, () => {
+      req.destroy(new Error('Request timeout'));
+    });
+
     req.on('error', (err) => reject(err));
     if (method !== 'GET') {
       req.write(body);
@@ -138,7 +168,7 @@ const server = http.createServer(async (req, res) => {
     incMetric(req.method, pathName, statusCode);
     
     // Send trace span to Jaeger asynchronously
-    sendSpan(`${req.method} ${pathName}`, activeTraceId, activeSpanId, incomingSpanId, start, duration);
+    sendSpan(`${req.method} ${pathName}`, activeTraceId, activeSpanId, incomingSpanId, start, duration, statusCode);
   };
 
   // Base metrics route
@@ -149,6 +179,15 @@ const server = http.createServer(async (req, res) => {
     Object.entries(requestCounter).forEach(([labels, count]) => {
       output += `http_requests_total{${labels}} ${count}\n`;
     });
+    
+    output += '# HELP process_cpu_usage_ratio Process CPU usage ratio\n';
+    output += '# TYPE process_cpu_usage_ratio gauge\n';
+    output += `process_cpu_usage_ratio ${getCpuUsageRatio().toFixed(4)}\n`;
+    
+    output += '# HELP process_memory_usage_ratio Process memory usage ratio\n';
+    output += '# TYPE process_memory_usage_ratio gauge\n';
+    output += `process_memory_usage_ratio ${getMemoryUsageRatio().toFixed(4)}\n`;
+
     return sendResponse(200, output, 'text/plain; version=0.0.4');
   }
 
@@ -158,11 +197,30 @@ const server = http.createServer(async (req, res) => {
     if (!type) {
       return sendResponse(400, { error: 'Missing fault type' });
     }
+    const currentFault = faultInjector.getActiveFault();
+    if (currentFault && currentFault.active) {
+      return sendResponse(409, {
+        error: 'Conflict: A fault is already active on this service',
+        active_fault: currentFault
+      });
+    }
     faultInjector.inject(type, duration_sec || 60, config || {});
     return sendResponse(200, { message: 'Fault ' + type + ' injected successfully' });
   }
 
+  // State Reset & Metrics Cleanup
+  if (pathName.endsWith('/reset') && req.method === 'POST') {
+    for (const key in requestCounter) {
+      delete requestCounter[key];
+    }
+    faultInjector.reset();
+    return sendResponse(200, { status: 'success', message: 'Service state cleanly reset' });
+  }
+
   // Health checks
+  if (pathName.endsWith('/fault-status') && req.method === 'GET') {
+    return sendResponse(200, faultInjector.getActiveFault());
+  }
   if (pathName.endsWith('/health') && req.method === 'GET') {
     return sendResponse(200, { status: 'UP', service: SERVICE_NAME });
   }

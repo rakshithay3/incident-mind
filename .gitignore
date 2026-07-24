@@ -116,3 +116,9 @@ telemetry-exporter/adjacency.json
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# Runtime data and logs
+*.jsonl
+*.txt
+datasets/
+code-agent-history/

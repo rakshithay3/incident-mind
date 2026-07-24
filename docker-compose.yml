@@ -35,6 +35,7 @@ services:
   auth-service:
     image: node:20-alpine
     container_name: shopmind-auth-service
+    restart: unless-stopped
     working_dir: /usr/src/app
     volumes:
       - ./services/auth-service:/usr/src/app
@@ -51,6 +52,7 @@ services:
   user-service:
     image: node:20-alpine
     container_name: shopmind-user-service
+    restart: unless-stopped
     working_dir: /usr/src/app
     volumes:
       - ./services/user-service:/usr/src/app
@@ -67,6 +69,7 @@ services:
   order-service:
     image: node:20-alpine
     container_name: shopmind-order-service
+    restart: unless-stopped
     working_dir: /usr/src/app
     volumes:
       - ./services/order-service:/usr/src/app
@@ -85,6 +88,7 @@ services:
   payment-service:
     image: node:20-alpine
     container_name: shopmind-payment-service
+    restart: unless-stopped
     working_dir: /usr/src/app
     volumes:
       - ./services/payment-service:/usr/src/app
@@ -103,6 +107,7 @@ services:
   inventory-service:
     image: node:20-alpine
     container_name: shopmind-inventory-service
+    restart: unless-stopped
     working_dir: /usr/src/app
     volumes:
       - ./services/inventory-service:/usr/src/app
@@ -119,6 +124,7 @@ services:
   notification-service:
     image: node:20-alpine
     container_name: shopmind-notification-service
+    restart: unless-stopped
     working_dir: /usr/src/app
     volumes:
       - ./services/notification-service:/usr/src/app
@@ -135,6 +141,7 @@ services:
   search-service:
     image: node:20-alpine
     container_name: shopmind-search-service
+    restart: unless-stopped
     working_dir: /usr/src/app
     volumes:
       - ./services/search-service:/usr/src/app
@@ -200,6 +207,7 @@ services:
   telemetry-exporter:
     image: node:20-alpine
     container_name: shopmind-telemetry-exporter
+    restart: unless-stopped
     working_dir: /usr/src/app
     volumes:
       - ./telemetry-exporter:/usr/src/app

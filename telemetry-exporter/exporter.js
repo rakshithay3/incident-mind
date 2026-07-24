@@ -66,63 +66,227 @@ function calculateSpearman(x, y) {
   return 1 - (6 * sumDiffSq) / (n * (n * n - 1));
 }
 
+let cachedFault = null;
+let cachedFaultTime = 0;
+
 async function queryTelemetry() {
   console.log('Querying telemetry data...');
   const nodes = [];
   const edges = [];
 
+  // 1. Query CPU & Memory from Prometheus
+  const cpuMap = {};
+  const memMap = {};
+
+  try {
+    const cpuRes = await httpGetJson(`${PROM_URL}/api/v1/query?query=process_cpu_usage_ratio`);
+    if (cpuRes && cpuRes.status === 'success' && cpuRes.data && cpuRes.data.result) {
+      for (const item of cpuRes.data.result) {
+        const instance = item.metric.instance; // e.g. "auth-service:3001"
+        if (instance) {
+          const serviceName = instance.split(':')[0];
+          cpuMap[serviceName] = parseFloat(item.value[1]);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error fetching CPU from Prometheus:', e.message);
+  }
+
+  try {
+    const memRes = await httpGetJson(`${PROM_URL}/api/v1/query?query=process_memory_usage_ratio`);
+    if (memRes && memRes.status === 'success' && memRes.data && memRes.data.result) {
+      for (const item of memRes.data.result) {
+        const instance = item.metric.instance;
+        if (instance) {
+          const serviceName = instance.split(':')[0];
+          memMap[serviceName] = parseFloat(item.value[1]);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error fetching Memory from Prometheus:', e.message);
+  }
+
+  // 2. Query Jaeger for each service's traces (latency & error rate)
+  const nodeTelemetry = {};
   for (const service of services) {
-    let cpu = 0.1 + Math.random() * 0.2;
-    let mem = 0.2 + Math.random() * 0.3;
-    let errorRate = Math.random() > 0.95 ? 0.05 : 0.0;
-    let meanLatency = 50 + Math.random() * 80;
-    let p99Latency = 200 + Math.random() * 250;
+    let totalSpans = 0;
+    let errorSpans = 0;
+    let sumDuration = 0;
+    let durations = [];
+    let entrypointCalls = 0;
 
     try {
-      // Query prometheus API natively
-      const cpuRes = await httpGetJson(`${PROM_URL}/api/v1/query?query=process_cpu_seconds_total`).catch(() => null);
-      if (cpuRes && cpuRes.data && cpuRes.data.result && cpuRes.data.result.length > 0) {
-        cpu = parseFloat(cpuRes.data.result[0].value[1]) % 1;
+      const tracesRes = await httpGetJson(`${JAEGER_URL}/api/traces?service=${service}&lookback=60s`);
+      if (tracesRes && tracesRes.data) {
+        for (const trace of tracesRes.data) {
+          const spans = trace.spans || [];
+          const processes = trace.processes || {};
+
+          for (const span of spans) {
+            const proc = processes[span.processID];
+            if (proc && proc.serviceName === service) {
+              totalSpans++;
+              const durationMs = span.duration / 1000;
+              sumDuration += durationMs;
+              durations.push(durationMs);
+
+              // Check error status in tags
+              const isError = (span.tags || []).some(tag =>
+                (tag.key === 'error' && (tag.value === true || tag.value === 'true')) ||
+                (tag.key === 'otel.status_code' && tag.value === 'ERROR')
+              );
+              if (isError) {
+                errorSpans++;
+              }
+
+              // Check if it's a top-level span and not metrics/health
+              const opName = span.operationName || '';
+              const isMetricsOrHealth = opName.includes('/metrics') || opName.includes('/health') || opName.includes('/fault-status');
+              const hasParent = span.references && span.references.length > 0;
+              if (!hasParent && !isMetricsOrHealth) {
+                entrypointCalls++;
+              }
+            }
+          }
+        }
       }
     } catch (e) {
-      // Fallback is used
+      console.error(`Error querying Jaeger traces for ${service}:`, e.message);
     }
+
+    let meanLatency = 0.0;
+    let p99Latency = 0.0;
+    let errorRate = 0.0;
+
+    if (totalSpans > 0) {
+      meanLatency = sumDuration / totalSpans;
+      errorRate = errorSpans / totalSpans;
+
+      durations.sort((a, b) => a - b);
+      const p99Idx = Math.floor(durations.length * 0.99);
+      p99Latency = durations[p99Idx];
+    }
+
+    nodeTelemetry[service] = {
+      errorRate,
+      meanLatency,
+      p99Latency,
+      entrypointCalls
+    };
 
     nodes.push({
       service_id: service,
-      cpu_pct: parseFloat(cpu.toFixed(2)),
-      mem_pct: parseFloat(mem.toFixed(2)),
-      error_rate: parseFloat(errorRate.toFixed(2)),
-      mean_latency_ms: parseFloat(meanLatency.toFixed(1)),
-      p99_latency_ms: parseFloat(p99Latency.toFixed(1))
+      cpu_pct: parseFloat((cpuMap[service] || 0.0).toFixed(4)),
+      mem_pct: parseFloat((memMap[service] || 0.0).toFixed(4)),
+      error_rate: parseFloat(errorRate.toFixed(4)),
+      mean_latency_ms: parseFloat(meanLatency.toFixed(2)),
+      p99_latency_ms: parseFloat(p99Latency.toFixed(2))
     });
   }
 
-  // Edges weights (call rates)
-  edges.push({ source: 'api-gateway', target: 'auth-service', call_count: Math.floor(100 + Math.random() * 50) });
-  edges.push({ source: 'api-gateway', target: 'order-service', call_count: Math.floor(50 + Math.random() * 30) });
-  edges.push({ source: 'order-service', target: 'payment-service', call_count: Math.floor(40 + Math.random() * 10) });
-  edges.push({ source: 'order-service', target: 'inventory-service', call_count: Math.floor(40 + Math.random() * 10) });
+  // 3. Query Edge call weights (Jaeger dependencies & entrypoints)
+  for (const service of services) {
+    const count = nodeTelemetry[service] ? nodeTelemetry[service].entrypointCalls : 0;
+    if (count > 0) {
+      edges.push({
+        source: 'api-gateway',
+        target: service,
+        call_count: count
+      });
+    }
+  }
 
-  // Spearman correlation checks
-  const sampleCpuHistory = Array.from({ length: 5 }, () => 0.1 + Math.random() * 0.5);
-  const sampleLatencyHistory = Array.from({ length: 5 }, () => 50 + Math.random() * 200);
-  const correlation = calculateSpearman(sampleCpuHistory, sampleLatencyHistory);
-  console.log(`Data quality validation: Spearman Correlation (CPU vs Latency) = ${correlation.toFixed(3)}`);
+  try {
+    const depRes = await httpGetJson(`${JAEGER_URL}/api/dependencies?endTs=${Date.now()}&lookback=60000`);
+    if (depRes && depRes.data) {
+      for (const edge of depRes.data) {
+        if (edge.parent && edge.child && edge.parent !== edge.child) {
+          edges.push({
+            source: edge.parent,
+            target: edge.child,
+            call_count: edge.callCount
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error fetching dependencies from Jaeger:', e.message);
+  }
+
+  // 4. Query active fault injection state from services (with fallback caching)
+  let activeFaultInfo = {
+    active: false,
+    fault_type: "",
+    target_service: "",
+    injected_at: "",
+    scheduled_duration_sec: 0,
+    auto_rollback: true
+  };
+  let groundTruthRootCause = "";
+
+  const portMap = {
+    'auth-service': 3001,
+    'user-service': 3002,
+    'order-service': 3003,
+    'payment-service': 3004,
+    'inventory-service': 3005,
+    'notification-service': 3006,
+    'search-service': 3007
+  };
+
+  let foundActiveFault = false;
+  for (const service of services) {
+    const port = portMap[service];
+    if (!port) continue;
+    try {
+      const statusUrl = `http://${service}:${port}/api/fault-status`;
+      const faultStatus = await httpGetJson(statusUrl);
+      if (faultStatus && faultStatus.active) {
+        activeFaultInfo = {
+          active: true,
+          fault_type: faultStatus.fault_type,
+          target_service: faultStatus.target_service,
+          injected_at: faultStatus.injected_at,
+          scheduled_duration_sec: faultStatus.scheduled_duration_sec,
+          auto_rollback: faultStatus.auto_rollback
+        };
+        groundTruthRootCause = service;
+        cachedFault = { ...activeFaultInfo };
+        cachedFaultTime = Date.now();
+        foundActiveFault = true;
+        break;
+      }
+    } catch (e) {
+      // Service failed to respond (could be down due to pod_crash)
+    }
+  }
+
+  // If no active fault was successfully polled, check the memory cache
+  // (essential for pod_crash scenarios where the service goes temporarily offline)
+  if (!foundActiveFault && cachedFault) {
+    const elapsedSec = (Date.now() - cachedFaultTime) / 1000;
+    if (cachedFault.scheduled_duration_sec === 0 || elapsedSec < cachedFault.scheduled_duration_sec) {
+      activeFaultInfo = { ...cachedFault };
+      groundTruthRootCause = cachedFault.target_service;
+    } else {
+      cachedFault = null;
+    }
+  }
+
+  // 5. Spearman Correlation Checks (CPU vs Mean Latency)
+  const currentCpus = nodes.map(n => n.cpu_pct);
+  const currentLatencies = nodes.map(n => n.mean_latency_ms);
+  const correlation = calculateSpearman(currentCpus, currentLatencies);
+  console.log(`Data quality validation: Spearman Correlation (CPU vs Latency) = ${isNaN(correlation) ? '0.000' : correlation.toFixed(3)}`);
 
   const payload = {
     timestamp: new Date().toISOString(),
     nodes,
     edges,
-    fault_injection: {
-      active: false,
-      fault_type: "",
-      target_service: "",
-      injected_at: "",
-      scheduled_duration_sec: 0,
-      auto_rollback: true
-    },
-    ground_truth_root_cause: ""
+    fault_injection: activeFaultInfo,
+    ground_truth_root_cause: groundTruthRootCause
   };
 
   try {

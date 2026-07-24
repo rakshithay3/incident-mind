@@ -3,6 +3,16 @@ let memoryBuffer = [];
 let memoryInterval = null;
 let delayMs = 0;
 
+const SERVICE_NAME = process.env.SERVICE_NAME || 'order-service';
+let activeFault = {
+  active: false,
+  fault_type: "",
+  target_service: SERVICE_NAME,
+  injected_at: "",
+  scheduled_duration_sec: 0,
+  auto_rollback: true
+};
+
 module.exports = {
   // Middleware to inject network delay
   delayMiddleware: (req, res, next) => {
@@ -33,6 +43,23 @@ module.exports = {
         }
       }
       delayMs = 0;
+      activeFault = {
+        active: false,
+        fault_type: "",
+        target_service: SERVICE_NAME,
+        injected_at: "",
+        scheduled_duration_sec: 0,
+        auto_rollback: true
+      };
+    };
+
+    activeFault = {
+      active: true,
+      fault_type: type,
+      target_service: SERVICE_NAME,
+      injected_at: new Date().toISOString(),
+      scheduled_duration_sec: durationSec,
+      auto_rollback: durationSec > 0
     };
 
     if (durationSec > 0) {
@@ -81,5 +108,30 @@ module.exports = {
     }
   },
   
-  getDelay: () => delayMs
+  getDelay: () => delayMs,
+  getActiveFault: () => activeFault,
+  reset: () => {
+    if (cpuInterval) {
+      clearInterval(cpuInterval);
+      cpuInterval = null;
+    }
+    if (memoryInterval) {
+      clearInterval(memoryInterval);
+      memoryInterval = null;
+      memoryBuffer = [];
+      if (global.gc) {
+        global.gc();
+      }
+    }
+    delayMs = 0;
+    activeFault = {
+      active: false,
+      fault_type: "",
+      target_service: SERVICE_NAME,
+      injected_at: "",
+      scheduled_duration_sec: 0,
+      auto_rollback: true
+    };
+    console.log(`Fault state cleanly reset.`);
+  }
 };
