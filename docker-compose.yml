@@ -219,6 +219,19 @@ services:
     networks:
       - shopmind-net
 
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy
+    container_name: shopmind-docker-socket-proxy
+    user: root
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CONTAINERS=1
+      - LOGS=1
+    networks:
+      - shopmind-net
+
 networks:
   shopmind-net:
     driver: bridge
+
