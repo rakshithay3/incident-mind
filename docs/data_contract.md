@@ -66,24 +66,34 @@ Each object in the array represents a service in the topology:
 - **`p99_latency_ms`** (float): 99th percentile span execution duration in milliseconds.
 - **`timestamp`** (string): Snapshot collection time.
 
-### Edges (`edges` array)
-Each object represents a service communication link:
-- **`source`** (string): Invoking service.
-- **`target`** (string): Receiver service.
-- **`call_count`** (integer): Frequency of spans along this link over the lookback window.
-- **`timestamp`** (string): Snapshot collection time.
+---
 
-### Fault Metadata (`fault_injection`)
-- **`active`** (boolean): True if an active failure injection is running.
-- **`fault_type`** (string): One of `"cpu_stress"`, `"memory_pressure"`, `"network_delay"`, or `"pod_crash"`.
-- **`target_service`** (string): The microservice ID subjected to the fault.
-- **`injected_at`** (string): ISO 8601 timestamp of failure injection.
-- **`scheduled_duration_sec`** (integer): Time limit in seconds before rollback.
-- **`auto_rollback`** (boolean): True if the fault is programmed to rollback.
+## 3. Topology Specification: Static Edge List
+
+The ShopMind microservice graph topology is governed by **16 static edges** representing all possible transaction routes and data dependencies. Dynamic call counts are mapped onto these edges by the telemetry pipeline:
+
+| Source Node | Target Node | Relationship / Dependency Type |
+| :--- | :--- | :--- |
+| `frontend` | `api-gateway` | Client storefront traffic route |
+| `api-gateway` | `auth-service` | User token validation and auth exchange |
+| `api-gateway` | `user-service` | User profile retrieval |
+| `api-gateway` | `order-service` | E-commerce checkout execution |
+| `api-gateway` | `search-service` | Storefront catalog queries |
+| `order-service` | `payment-service` | Transaction payment capture |
+| `order-service` | `inventory-service` | Inventory stock deduction |
+| `order-service` | `notification-service` | Transaction email triggers |
+| `auth-service` | `postgres-primary` | Relational credential lookup |
+| `user-service` | `postgres-primary` | Relational user profile storage |
+| `order-service` | `postgres-primary` | Relational transaction log record |
+| `payment-service` | `postgres-primary` | Relational payment status record |
+| `inventory-service` | `postgres-primary` | Relational stock level update |
+| `search-service` | `postgres-replica` | Relational catalog query reading |
+| `auth-service` | `cache` | Session token validation caching (Redis) |
+| `postgres-primary` | `postgres-replica` | Primary-to-Replica streaming replication |
 
 ---
 
-## 3. Data Validation Report Schema: `validation_report.json`
+## 4. Data Validation Report Schema: `validation_report.json`
 
 The validator writes an audit report verifying the health and validity of the telemetry data:
 
@@ -96,7 +106,8 @@ The validator writes an audit report verifying the health and validity of the te
     "auth-service": {
       "cpu_vs_latency_spearman": 0.85,
       "errors_vs_p99_spearman": 0.91,
-      "metrics_flatlined": false
+      "metrics_flatlined": false,
+      "insufficient_samples": false
     }
   },
   "graph_validation": {
@@ -112,10 +123,11 @@ The validator writes an audit report verifying the health and validity of the te
     "details": "inventory-service mean latency (81.49ms) is 56.6x baseline (1.44ms)"
   }
 }
+```
 
 ---
 
-## 4. GNN Modeling Assumptions & Cascading Timeout Tradeoffs
+## 5. GNN Modeling Assumptions & Cascading Timeout Tradeoffs
 
 ### Network Delay Latency Asymmetry
 When a `network_delay` (2s delay) is injected on a downstream service (e.g. `payment-service` or `inventory-service`):
@@ -124,5 +136,3 @@ When a `network_delay` (2s delay) is injected on a downstream service (e.g. `pay
 
 > [!IMPORTANT]
 > **Modeling Assumption**: For downstream `network_delay` faults, the ground-truth-labeled root cause node may exhibit healthy local telemetry features. The fault anomaly signature exists primarily on the caller/upstream node in the dependency graph. Graph-based GNN models must rely on multi-hop neighborhood aggregation to trace the root cause back to the target node.
-
-```

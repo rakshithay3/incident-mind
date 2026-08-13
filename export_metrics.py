@@ -211,6 +211,17 @@ def collect_all_telemetry(services_config, lookback_sec=10):
         "metrics": {n["service_id"]: n for n in nodes if n["service_id"] in node_telemetry_cache}
     }
     try:
+        import os
+        lines = []
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, "r") as r_hf:
+                lines = r_hf.readlines()
+        if len(lines) > 2000:
+            temp_file = HISTORY_FILE + ".tmp"
+            with open(temp_file, "w") as w_hf:
+                w_hf.writelines(lines[-1000:])
+            os.replace(temp_file, HISTORY_FILE)
+            
         with open(HISTORY_FILE, "a") as hf:
             hf.write(json.dumps(history_entry) + "\n")
     except Exception as e:

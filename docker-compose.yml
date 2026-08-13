@@ -4,6 +4,7 @@ services:
   frontend:
     image: nginx:alpine
     container_name: shopmind-frontend
+    restart: unless-stopped
     ports:
       - "3000:80"
     volumes:
@@ -17,6 +18,7 @@ services:
   api-gateway:
     image: nginx:alpine
     container_name: shopmind-api-gateway
+    restart: unless-stopped
     ports:
       - "80:80"
     volumes:
@@ -158,8 +160,6 @@ services:
   cache:
     image: redis:alpine
     container_name: shopmind-cache
-    ports:
-      - "6379:6379"
     networks:
       - shopmind-net
 
@@ -169,8 +169,6 @@ services:
     environment:
       POSTGRES_PASSWORD: devpass
       POSTGRES_DB: shopmind
-    ports:
-      - "5432:5432"
     networks:
       - shopmind-net
 
@@ -180,8 +178,6 @@ services:
     environment:
       POSTGRES_PASSWORD: devpass
       POSTGRES_DB: shopmind
-    ports:
-      - "5433:5432"
     networks:
       - shopmind-net
 
@@ -204,20 +200,6 @@ services:
     networks:
       - shopmind-net
 
-  telemetry-exporter:
-    image: node:20-alpine
-    container_name: shopmind-telemetry-exporter
-    restart: unless-stopped
-    working_dir: /usr/src/app
-    volumes:
-      - ./telemetry-exporter:/usr/src/app
-    environment:
-      - PROMETHEUS_URL=http://prometheus:9090
-      - JAEGER_URL=http://jaeger:16686
-      - EXPORT_PATH=/usr/src/app/adjacency.json
-    command: node exporter.js
-    networks:
-      - shopmind-net
 
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy

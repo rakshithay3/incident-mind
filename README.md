@@ -45,15 +45,24 @@ Every microservice exposes a secure `/inject-fault` POST endpoint. The following
 
 ## 📊 GNN Data Pipeline Exporter
 
-The `telemetry-exporter` daemon queries the Prometheus and Jaeger REST APIs every 10 seconds to generate an adjacency tree file at `telemetry-exporter/adjacency.json`. 
-It records:
-* Average CPU/Memory ratios per service.
-* Error counts and average latency.
-* Edge call weights (frequency of inter-service communication).
-* Ground-truth labels of any active fault injection (essential for GNN training).
-* Spearman Rank Correlation checks validating telemetry data quality.
+The GNN telemetry exporter is implemented in Python ([export_metrics.py](file:///c:/Users/HP/.gemini/antigravity/scratch/shopmind/export_metrics.py) and [adjacency_export.py](file:///c:/Users/HP/.gemini/antigravity/scratch/shopmind/adjacency_export.py)). It scrapes system metrics and Jaeger traces, performs rank-correlation and structural schema checks, and exports validated graph data to the active dataset experiment directory.
+
+> [!NOTE]
+> **Legacy Exporter Removal**: The legacy Node.js `telemetry-exporter` service has been deprecated and deleted from the codebase. All telemetry data collection and GNN feature exports now run exclusively via the Python pipeline.
+
+### How it Works:
+1. **Metrics Scraping**: `export_metrics.py` directly queries the `/metrics` endpoint of each service to retrieve CPU and memory usage statistics.
+2. **Trace Evaluation**: It queries Jaeger's HTTP REST API to compute rolling request counts, mean/p99 latencies, and HTTP error rates for all services.
+3. **Graph Assembly**: `adjacency_export.py` compiles these nodes and call counts across the 16 static inter-service edges to build the graph topology.
+4. **Data Verification**:
+   - **Spearman Rank Correlation**: Computes the Spearman rank correlation between CPU-vs-latency and Error-vs-p99 values, raising an `insufficient_samples` fallback if there are too few datapoints.
+   - **Schema & Connectivity Checks**: Audits the resulting graph for duplicate nodes, disconnected service subgraphs, and schema completeness.
+   - **Label-Integrity Safety Net**: Refuses to output data if a chaos fault was actively injected but is missing a valid label.
+
+The outputs (the compiled `adjacency.json` and a detailed `validation_report.json`) are written directly to the target incident folder under `datasets/incident_XXX/`.
 
 ---
+
 
 ## 🚀 How to Run the Project
 
