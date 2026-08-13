@@ -31,3 +31,11 @@ This document verifies the ShopMind chaos testing framework against standard mic
 * **Gap Description**: While `postgres-primary`, `postgres-replica`, and `cache` (Redis) run inside the Docker net, the microservices do not read/write to them, nor do we scrape their engine metrics (e.g. database locks, cache hit ratios, Redis evictions).
 * **Impact**: Downstream GNN models cannot learn node-failure patterns arising from database contention or cache evictions.
 * **Recommendation**: In future iterations, bind database client queries to the order and user services, scrape PostgreSQL connection logs, and introduce database transaction lock injections.
+
+---
+
+## 3. References
+
+1. **Silva et al. (2022)**: *"Towards a Fault Taxonomy for Microservices-Based Applications"*. In *Proceedings of the 36th Brazilian Symposium on Software Engineering* (SBES 2022), Sociedade Brasileira de Computação (SBC).
+2. **Zhou et al. (2021)**: *"Fault Analysis and Debugging of Microservice Systems: Industrial Survey, Benchmark System, and Empirical Study"*. *IEEE Transactions on Software Engineering* (TSE 2021).
+

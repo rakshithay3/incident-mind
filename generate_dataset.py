@@ -81,6 +81,9 @@ def run_incident(incident_id, services_config, service_name, fault_type):
         if cfg_s.get("role") == "app":
             send_post(f"http://{cfg_s['host']}:{cfg_s['port']}/reset", {})
             
+    # 5.5 Dynamically verify all services are clean and settled (metrics-aware under active load)
+    wait_for_services_to_settle(services_config, timeout_sec=20)
+            
     # 6. Terminate Load Generator
     load_proc.terminate()
     load_proc.wait()
@@ -108,6 +111,93 @@ def run_incident(incident_id, services_config, service_name, fault_type):
     except Exception as e:
         print(f"Error saving incident data: {e}")
 
+def get_service_metrics(host, port):
+    url = f"http://{host}:{port}/metrics"
+    try:
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=1) as res:
+            text = res.read().decode("utf-8")
+        cpu = None
+        mem = None
+        for line in text.split("\n"):
+            if line.startswith("process_cpu_usage_ratio"):
+                cpu = float(line.split()[1])
+            elif line.startswith("process_memory_usage_ratio"):
+                mem = float(line.split()[1])
+        return cpu, mem
+    except Exception:
+        return None, None
+
+def wait_for_services_to_settle(services_config, timeout_sec=20):
+    print("Verifying that all services have fully settled and are healthy (latency & metrics-aware)...")
+    start_time = time.time()
+    
+    while time.time() - start_time < timeout_sec:
+        all_settled = True
+        for name, cfg in services_config.items():
+            if cfg.get("role") != "app":
+                continue
+                
+            # 1. Check health endpoint (HTTP 200)
+            health_url = f"http://{cfg['host']}:{cfg['port']}/health"
+            try:
+                req = urllib.request.Request(health_url)
+                with urllib.request.urlopen(req, timeout=1) as res:
+                    if res.status != 200:
+                        all_settled = False
+                        break
+            except Exception:
+                all_settled = False
+                break
+                
+            # 2. Check active fault status (should be false)
+            fault_url = f"http://{cfg['host']}:{cfg['port']}/api/fault-status"
+            try:
+                req = urllib.request.Request(fault_url)
+                with urllib.request.urlopen(req, timeout=1) as res:
+                    fault_status = json.loads(res.read().decode("utf-8"))
+                    if fault_status.get("active"):
+                        all_settled = False
+                        break
+            except Exception:
+                all_settled = False
+                break
+
+            # 3. Check actual CPU metrics to ensure they are back to baseline
+            cpu, mem = get_service_metrics(cfg["host"], cfg["port"])
+            # If CPU is successfully scraped, verify it is below the threshold. Ignore transient timeouts.
+            if cpu is not None and cpu > 0.15:
+                all_settled = False
+                break
+
+
+
+        # 4. Check Jaeger transaction metrics (latency and error rate) under active load
+        if all_settled:
+            try:
+                nodes, _ = export_metrics.collect_all_telemetry(services_config, 5)
+                for node in nodes:
+                    srv = node["service_id"]
+                    if srv in ["order-service", "payment-service", "inventory-service", "user-service", "auth-service", "notification-service", "search-service"]:
+                        lat = node.get("mean_latency_ms")
+                        err = node.get("error_rate")
+                        if (lat is not None and lat > 100.0) or (err is not None and err > 0.10):
+                            all_settled = False
+                            print(f"  Service '{srv}' still recovering from backlog: Latency={lat:.2f}ms, ErrorRate={err:.2f}")
+                            break
+            except Exception:
+                all_settled = False
+
+        if all_settled:
+            elapsed = time.time() - start_time
+            print(f"All services settled cleanly and verified healthy after {elapsed:.2f}s.")
+            return True
+            
+        time.sleep(1)
+        
+    print(f"Warning: Settle check timed out after {timeout_sec}s. Some services might not be fully healthy.")
+    return False
+
 def main():
     parser = argparse.ArgumentParser(description="ShopMind Incident Dataset Generator")
     parser.add_argument("--count", type=int, default=5, help="Number of synthetic incidents to run")
@@ -127,13 +217,11 @@ def main():
         target = random.choice(app_services)
         fault = random.choice(fault_types)
         
-        # If fault is pod_crash, we wait an extra 5 seconds after reset to let containers boot up
         run_incident(i, services_config, target, fault)
-        if fault == "pod_crash":
-            print("Waiting 5s for crashed container to complete Docker restart...")
-            time.sleep(5)
             
     print("\nBatch incident generation completed successfully!")
 
 if __name__ == "__main__":
     main()
+
+

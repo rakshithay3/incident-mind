@@ -112,4 +112,17 @@ The validator writes an audit report verifying the health and validity of the te
     "details": "inventory-service mean latency (81.49ms) is 56.6x baseline (1.44ms)"
   }
 }
+
+---
+
+## 4. GNN Modeling Assumptions & Cascading Timeout Tradeoffs
+
+### Network Delay Latency Asymmetry
+When a `network_delay` (2s delay) is injected on a downstream service (e.g. `payment-service` or `inventory-service`):
+- **Caller Node Signal**: The calling service (`order-service`) enforces a `1.5s` client-side timeout. It aborts the request and registers a massive latency spike (exactly `~1500ms` at `p99_latency_ms`) and a `500` error rate spike.
+- **Target Node Signal**: Because the calling socket is destroyed at `1.5s`, the target service's subsequent response write throws a connection reset error in Node.js. This bypasses the tracing telemetry callback. Consequently, the target service itself will **not** show a latency spike in Jaeger (its latency remains clean/idle, e.g., `<2ms`).
+
+> [!IMPORTANT]
+> **Modeling Assumption**: For downstream `network_delay` faults, the ground-truth-labeled root cause node may exhibit healthy local telemetry features. The fault anomaly signature exists primarily on the caller/upstream node in the dependency graph. Graph-based GNN models must rely on multi-hop neighborhood aggregation to trace the root cause back to the target node.
+
 ```

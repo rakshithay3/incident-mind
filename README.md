@@ -1,4 +1,5 @@
-# ShopMind E-Commerce Chaos Testing Sandbox
+# ShopMind 
+
 
 Welcome to the **ShopMind** e-commerce chaos testing sandbox. This repository contains a fully functional, zero-dependency, 12-microservice ecosystem designed to test distributed systems, trace request propagation, collect metrics, and evaluate GNN-based root cause analysis (RCA) models under real-world system failures.
 
@@ -10,7 +11,7 @@ The environment is built using Nginx routers and lightweight, zero-dependency No
 
 ### Services Mapping:
 * **`frontend` (Port `3000`)**: Responsive dark-mode single page application showcasing the tech storefront, live request logs, and chaos trigger switches.
-* **`api-gateway` (Port `80`)**: Nginx reverse proxy distributing prefix routes to backends.
+* **`api-gateway` (Port `80`)**: Nginx reverse proxy distributing prefix routes togit  backends.
 * **`auth-service` (Port `3001`)**: Mock JWT credential exchange.
 * **`user-service` (Port `3002`)**: Simple user profile storage.
 * **`order-service` (Port `3003`)**: Orchestrator executing the transaction workflow (deducts stock $\rightarrow$ creates payment order $\rightarrow$ sends notification).
