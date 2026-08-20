@@ -5,6 +5,7 @@ import random
 import os
 import argparse
 import subprocess
+import sys
 import export_metrics
 import adjacency_export
 
@@ -201,8 +202,25 @@ def wait_for_services_to_settle(services_config, timeout_sec=20):
 def main():
     parser = argparse.ArgumentParser(description="ShopMind Incident Dataset Generator")
     parser.add_argument("--count", type=int, default=5, help="Number of synthetic incidents to run")
+    parser.add_argument("--seed", type=int, default=None, help="Deterministic seed for service and fault selection")
+    parser.add_argument("--schedule", type=str, default=None, help="Path to JSON schedule file containing explicit incidents list")
     args = parser.parse_args()
     
+    if args.seed is not None:
+        random.seed(args.seed)
+        print(f"Deterministic seed set: {args.seed}")
+        
+    schedule = None
+    if args.schedule:
+        try:
+            with open(args.schedule, "r") as sf:
+                schedule = json.load(sf)
+            print(f"Loaded explicit schedule containing {len(schedule)} incidents from {args.schedule}")
+            args.count = len(schedule)
+        except Exception as e:
+            print(f"Error loading schedule file {args.schedule}: {e}")
+            sys.exit(1)
+            
     services_config = load_services()
     if not services_config:
         sys.exit(1)
@@ -214,9 +232,15 @@ def main():
         os.makedirs(DATASET_DIR)
         
     for i in range(1, args.count + 1):
-        target = random.choice(app_services)
-        fault = random.choice(fault_types)
-        
+        if schedule is not None:
+            # Expects list of {"target": "...", "fault": "..."}
+            item = schedule[i - 1]
+            target = item["target"]
+            fault = item["fault"]
+        else:
+            target = random.choice(app_services)
+            fault = random.choice(fault_types)
+            
         run_incident(i, services_config, target, fault)
             
     print("\nBatch incident generation completed successfully!")
