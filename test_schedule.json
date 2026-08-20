@@ -1,0 +1,14 @@
+[
+  {
+    "target": "auth-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "payment-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "search-service",
+    "fault": "pod_crash"
+  }
+]
