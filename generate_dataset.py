@@ -180,7 +180,7 @@ def wait_for_services_to_settle(services_config, timeout_sec=20):
                 for node in nodes:
                     srv = node["service_id"]
                     if srv in ["order-service", "payment-service", "inventory-service", "user-service", "auth-service", "notification-service", "search-service"]:
-                        lat = node.get("latency")
+                        lat = node.get("mean_latency_ms")
                         err = node.get("error_rate")
                         if (lat is not None and lat > 100.0) or (err is not None and err > 0.10):
                             all_settled = False

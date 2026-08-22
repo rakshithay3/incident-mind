@@ -132,11 +132,11 @@ def collect_all_telemetry(services_config, lookback_sec=10):
             
             nodes.append({
                 "service_id": name,
-                "cpu": round(cpu, 4) if cpu is not None else None,
-                "memory": round(mem, 4) if mem is not None else None,
+                "cpu_pct": round(cpu, 4) if cpu is not None else None,
+                "mem_pct": round(mem, 4) if mem is not None else None,
                 "error_rate": round(err_rate, 4),
-                "latency": round(mean_lat, 2),
-                "p99_latency": round(p99_lat, 2),
+                "mean_latency_ms": round(mean_lat, 2),
+                "p99_latency_ms": round(p99_lat, 2),
                 "timestamp": timestamp
             })
             node_telemetry_cache[name] = entry_calls
@@ -144,11 +144,11 @@ def collect_all_telemetry(services_config, lookback_sec=10):
             # Non-app nodes (edge/infra) have default zero metrics but are still represented
             nodes.append({
                 "service_id": name,
-                "cpu": 0.0,
-                "memory": 0.0,
+                "cpu_pct": 0.0,
+                "mem_pct": 0.0,
                 "error_rate": 0.0,
-                "latency": 0.0,
-                "p99_latency": 0.0,
+                "mean_latency_ms": 0.0,
+                "p99_latency_ms": 0.0,
                 "timestamp": timestamp
             })
             node_telemetry_cache[name] = 0

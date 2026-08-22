@@ -122,6 +122,4 @@ Thumbs.db
 *.jsonl
 *.txt
 datasets/
-datasets_compiled/
-shopmind_evaluation_dataset.zip
 code-agent-history/
