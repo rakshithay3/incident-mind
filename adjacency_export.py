@@ -173,10 +173,10 @@ def run_validation(nodes, edges, fault_info, history_entries):
             for entry in history_entries:
                 srv_metrics = entry.get("metrics", {}).get(service, {})
                 if srv_metrics:
-                    cpu_history.append(srv_metrics.get("cpu_pct", 0.0))
-                    lat_history.append(srv_metrics.get("mean_latency_ms", 0.0))
+                    cpu_history.append(srv_metrics.get("cpu", 0.0))
+                    lat_history.append(srv_metrics.get("latency", 0.0))
                     err_history.append(srv_metrics.get("error_rate", 0.0))
-                    p99_history.append(srv_metrics.get("p99_latency_ms", 0.0))
+                    p99_history.append(srv_metrics.get("p99_latency", 0.0))
             
             # Filter out any history samples that contain None
             valid_cpu_lat = [(c, l) for c, l in zip(cpu_history, lat_history) if c is not None and l is not None]
@@ -218,7 +218,7 @@ def run_validation(nodes, edges, fault_info, history_entries):
             }
             
             # Fail if metrics are flatlined for an app service
-            if metrics_flatlined and service in [n["service_id"] for n in nodes if n["cpu_pct"] > 0]:
+            if metrics_flatlined and service in [n["service_id"] for n in nodes if n["cpu"] > 0]:
                 report["validation_passed"] = False
     else:
         report["validation_passed"] = False
@@ -238,8 +238,8 @@ def run_validation(nodes, edges, fault_info, history_entries):
         if service in ["frontend", "api-gateway", "cache", "postgres-primary", "postgres-replica"]:
             continue
             
-        current_lat = node.get("mean_latency_ms")
-        current_cpu = node.get("cpu_pct")
+        current_lat = node.get("latency")
+        current_cpu = node.get("cpu")
         current_err = node.get("error_rate")
         
         # Calculate baseline from history
@@ -249,8 +249,8 @@ def run_validation(nodes, edges, fault_info, history_entries):
             m = entry.get("metrics", {}).get(service, {})
             if m:
                 # Filter out None values in baseline calculation
-                h_lat = m.get("mean_latency_ms")
-                h_cpu = m.get("cpu_pct")
+                h_lat = m.get("latency")
+                h_cpu = m.get("cpu")
                 if h_lat is not None:
                     lats.append(h_lat)
                 if h_cpu is not None:
@@ -295,7 +295,7 @@ def run_validation(nodes, edges, fault_info, history_entries):
         if not is_target_anomalous:
             # Special check for pod_crash: node might have 0 metrics
             target_node = next((n for n in nodes if n["service_id"] == target_service), None)
-            if fault_type == "pod_crash" and target_node and target_node.get("cpu_pct", 0.0) == 0.0 and target_node.get("mean_latency_ms", 0.0) == 0.0:
+            if fault_type == "pod_crash" and target_node and target_node.get("cpu", 0.0) == 0.0 and target_node.get("latency", 0.0) == 0.0:
                 report["fault_impact_validation"]["deviation_detected"] = True
                 report["fault_impact_validation"]["details"] = f"Pod crash successfully detected: target {target_service} shows flatlined metrics."
             else:
@@ -351,8 +351,8 @@ def export_data(experiment_id, dataset_version, validate_flag):
         
         target_exhibits_symptoms = False
         if target_node:
-            current_lat = target_node.get("mean_latency_ms")
-            current_cpu = target_node.get("cpu_pct")
+            current_lat = target_node.get("latency")
+            current_cpu = target_node.get("cpu")
             current_err = target_node.get("error_rate")
             
             history_entries = read_history()
@@ -361,8 +361,8 @@ def export_data(experiment_id, dataset_version, validate_flag):
             for entry in history_entries:
                 m = entry.get("metrics", {}).get(target_service, {})
                 if m:
-                    h_lat = m.get("mean_latency_ms")
-                    h_cpu = m.get("cpu_pct")
+                    h_lat = m.get("latency")
+                    h_cpu = m.get("cpu")
                     if h_lat is not None:
                         lats.append(h_lat)
                     if h_cpu is not None:
@@ -398,7 +398,7 @@ def export_data(experiment_id, dataset_version, validate_flag):
         "nodes": nodes,
         "edges": edges,
         "fault_injection": fault_info,
-        "ground_truth_root_cause": ground_truth
+        "root_cause": ground_truth
     }
     
     # Output directory setup
