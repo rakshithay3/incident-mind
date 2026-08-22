@@ -72,7 +72,34 @@ def select_peak_anomaly_snapshot(failure_history, baseline_averages, target_serv
             max_score = score
             best_snap = snap
             
-    return best_snap
+    # Find index of the selected snap to guide our last-known-good history search
+    snap_idx = 15
+    for idx, s in enumerate(failure_history):
+        if s.get("timestamp") == best_snap.get("timestamp"):
+            snap_idx = idx
+            break
+            
+    return best_snap, snap_idx
+
+def find_last_known_good(service_id, key, snap_idx, failure_history, baseline_history, fallback_val):
+    """Searches backward in time for the most recent valid telemetry sample."""
+    # 1. Search failure history backwards starting from snap_idx - 1
+    for idx in range(snap_idx - 1, -1, -1):
+        for node in failure_history[idx].get("nodes", []):
+            if node["service_id"] == service_id:
+                val = node.get(key)
+                if val is not None:
+                    return val
+                    
+    # 2. Search baseline history backwards starting from the end
+    for idx in range(len(baseline_history) - 1, -1, -1):
+        for node in baseline_history[idx].get("nodes", []):
+            if node["service_id"] == service_id:
+                val = node.get(key)
+                if val is not None:
+                    return val
+                    
+    return fallback_val
 
 def compile_incident(inc_dir):
     series_path = os.path.join(inc_dir, "telemetry_series.json")
@@ -93,7 +120,7 @@ def compile_incident(inc_dir):
         
     # Calculate baseline averages and select the peak anomaly snapshot dynamically
     baseline_averages = get_baseline_averages(baseline_history)
-    snap = select_peak_anomaly_snapshot(failure_history, baseline_averages, target, fault)
+    snap, snap_idx = select_peak_anomaly_snapshot(failure_history, baseline_averages, target, fault)
     if not snap:
         return None
     
@@ -101,22 +128,42 @@ def compile_incident(inc_dir):
     compiled_nodes = []
     for node in snap.get("nodes", []):
         srv_id = node.get("service_id")
+        base = baseline_averages.get(srv_id, {"cpu": 0.02, "memory": 0.1, "latency": 5.0})
         
-        # Read original telemetry schema fields from source
+        # CPU (Coerce nulls)
         cpu = node.get("cpu_pct")
+        if cpu is None:
+            cpu = find_last_known_good(srv_id, "cpu_pct", snap_idx, failure_history, baseline_history, base["cpu"])
+            
+        # Memory (Coerce nulls)
         memory = node.get("mem_pct")
+        if memory is None:
+            memory = find_last_known_good(srv_id, "mem_pct", snap_idx, failure_history, baseline_history, base["memory"])
+            
+        # Latency (Coerce nulls)
         latency = node.get("mean_latency_ms")
+        if latency is None:
+            latency = find_last_known_good(srv_id, "mean_latency_ms", snap_idx, failure_history, baseline_history, base["latency"])
+            
+        # P99 Latency (Coerce nulls)
         p99_lat = node.get("p99_latency_ms")
-        err_rate = node.get("error_rate", 0.0)
+        if p99_lat is None:
+            p99_fallback = base["latency"] * 3.0 if base["latency"] > 0 else 20.0
+            p99_lat = find_last_known_good(srv_id, "p99_latency_ms", snap_idx, failure_history, baseline_history, p99_fallback)
+            
+        # Error Rate (Coerce nulls)
+        err_rate = node.get("error_rate")
+        if err_rate is None:
+            err_rate = find_last_known_good(srv_id, "error_rate", snap_idx, failure_history, baseline_history, 0.0)
         
         # Map values to the GNN schema expected by loader.py
         compiled_nodes.append({
             "service_id": srv_id,
-            "cpu": round(cpu, 4) if cpu is not None else None,
-            "memory": round(memory, 4) if memory is not None else None,
+            "cpu": round(cpu, 4),
+            "memory": round(memory, 4),
             "error_rate": round(err_rate, 4),
-            "latency": round(latency, 2) if latency is not None else None,
-            "p99_latency": round(p99_lat, 2) if p99_lat is not None else None,
+            "latency": round(latency, 2),
+            "p99_latency": round(p99_lat, 2),
             "label": 1 if srv_id == target else 0
         })
         
