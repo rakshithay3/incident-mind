@@ -43,7 +43,7 @@ def run_incident(incident_id, services_config, service_name, fault_type):
             send_post(f"http://{cfg_s['host']}:{cfg_s['port']}/reset", {})
             
     # 1. Start Load Generator Process
-    load_proc = subprocess.Popen(["python", "load_generator.py"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    load_proc = subprocess.Popen([sys.executable, "load_generator.py"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
     # 2. Collect baseline telemetry for 10 seconds
     print("Collecting 10s baseline metrics...")
