@@ -232,6 +232,11 @@ def main():
         os.makedirs(DATASET_DIR)
         
     for i in range(1, args.count + 1):
+        inc_dir = os.path.join(DATASET_DIR, f"incident_{i:03d}")
+        if os.path.exists(os.path.join(inc_dir, "telemetry_series.json")):
+            print(f"Incident {i:03d} already exists on disk. Skipping to support resuming...")
+            continue
+            
         if schedule is not None:
             # Expects list of {"target": "...", "fault": "..."}
             item = schedule[i - 1]
