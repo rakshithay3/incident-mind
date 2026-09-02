@@ -54,15 +54,16 @@ def select_peak_anomaly_snapshot(failure_history, baseline_averages, target_serv
             curr_lat = node.get("mean_latency_ms") or 0.0
             curr_err = node.get("error_rate") or 0.0
             
-            # Anomaly score based on deviations from baseline
+            # Anomaly score based on absolute deviations from baseline
             cpu_dev = max(0.0, curr_cpu - base["cpu"])
             mem_dev = max(0.0, curr_mem - base["memory"])
-            lat_ratio = curr_lat / max(1.0, base["latency"])
+            lat_dev = max(0.0, curr_lat - base["latency"])
             
-            # High weight on errors and target symptoms
-            score += (cpu_dev * 5.0) + (mem_mem := mem_dev * 5.0) + curr_err * 10.0
-            if lat_ratio > 3.0:
-                score += lat_ratio
+            # Weight target service symptoms higher to prevent bystander ratio spikes from biasing selection
+            is_target = (srv == target_service)
+            w = 3.0 if is_target else 1.0
+
+            score += ((cpu_dev * 5.0) + (mem_dev * 5.0) + curr_err * 10.0 + (lat_dev * 0.1)) * w
                 
             # If this is the target service of the crash, lack of metrics is anomalous
             if srv == target_service and fault_type == "pod_crash" and (node.get("cpu_pct") is None or node.get("cpu_pct") == 0.0):
