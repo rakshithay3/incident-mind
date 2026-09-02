@@ -123,3 +123,7 @@ Thumbs.db
 *.txt
 datasets/
 code-agent-history/
+datasets_compiled/
+*.zip
+__pycache__/
+*.pyc
