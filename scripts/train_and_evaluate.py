@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from incidentmind_p1.contracts import NodeScore
 from incidentmind_p1.evaluation import evaluate_ranking
 from incidentmind_p1.loader import load_dataset, summarize_dataset
-from incidentmind_p1.training import FeatureStats, score_incident, train_graphsage
+from incidentmind_p1.training import FeatureStats, save_checkpoint, score_incident, train_graphsage
 
 ROOT = Path(__file__).resolve().parent.parent
 DATASET_DIR = ROOT / "data" / "rcaeval_re1"
@@ -41,6 +41,13 @@ def main() -> None:
         "--print-per-incident",
         action="store_true",
         help="Print the full per-incident root-cause report (like notebook cell 46).",
+    )
+    parser.add_argument(
+        "--save-model",
+        default="models/graphsage.pt",
+        help="Path to save the trained encoder + FeatureStats checkpoint (used by train_ppo.py "
+             "and evaluate_ppo.py to score with the real GNN instead of the z-score fallback). "
+             "Pass '' to skip saving.",
     )
     args = parser.parse_args()
 
@@ -67,6 +74,10 @@ def main() -> None:
     for h in history[::10]:
         print(h.epoch, round(h.loss, 4))
     print("final loss:", round(history[-1].loss, 4))
+
+    if args.save_model:
+        save_checkpoint(encoder, stats, args.save_model)
+        print(f"Saved GraphSAGE checkpoint to {args.save_model}")
 
     # --- Evaluate: aggregate PR@k / MTTD -------------------------------------
     results = []

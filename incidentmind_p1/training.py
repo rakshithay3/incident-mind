@@ -223,22 +223,44 @@ def score_incident(
     return sorted(scored, key=lambda item: item[1], reverse=True)
 
 
-def ppo_training_loop_skeleton() -> None:
-    """Placeholder for Stable-Baselines3 PPO environment wiring.
+def save_checkpoint(encoder: GraphSAGEEncoder, stats: FeatureStats, path: str) -> None:
+    """Persist model weights + FeatureStats together so inference (including on
+    held-out RE1 test incidents and ShopMind) reuses the exact stats the model
+    was trained with, never refitting them (see FeatureStats docstring)."""
+    try:
+        import torch
+    except ImportError as exc:
+        raise RuntimeError("install torch to save a GraphSAGE checkpoint") from exc
 
-    Deferred until score_incident() above is producing real (non-random)
-    rankings on held-out RCAEval incidents -- PPO's state is the GNN's
-    ranked embeddings, so training it against an untrained GNN just teaches
-    the policy to fit noise.
+    from pathlib import Path
 
-    Planned shape:
-      State:  ranked GraphSAGE embeddings (N x 128) + visited-service
-              one-hot history.
-      Action: agent_type (log/metrics/code) x target_service, discrete.
-      Reward: +1.0 solve, -0.1/step, -0.5 repeated service.
-      Algo:   PPO (Stable-Baselines3), clipped surrogate objective, entropy
-              bonus for exploration. Chosen over DQN/A2C for stability in
-              the low-data regime (500 simulated incidents).
-      Validation: held-out incidents, report mttd_steps + root-cause
-              accuracy via evaluation.evaluate_ranking.
-    """
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    torch.save(
+        {
+            "model_state_dict": encoder.model.state_dict(),
+            "means": list(stats.means),
+            "stds": list(stats.stds),
+            "feature_names": list(stats.feature_names),
+        },
+        path,
+    )
+
+
+def load_checkpoint(path: str) -> Tuple[GraphSAGEEncoder, FeatureStats]:
+    """Load a checkpoint written by save_checkpoint(). Returns (encoder, stats)
+    ready to pass straight into score_incident()."""
+    try:
+        import torch
+    except ImportError as exc:
+        raise RuntimeError("install torch to load a GraphSAGE checkpoint") from exc
+
+    checkpoint = torch.load(path, map_location="cpu", weights_only=False)
+    stats = FeatureStats(
+        means=tuple(checkpoint["means"]),
+        stds=tuple(checkpoint["stds"]),
+        feature_names=tuple(checkpoint["feature_names"]),
+    )
+    encoder = GraphSAGEEncoder(in_channels=len(stats.feature_names))
+    encoder.model.load_state_dict(checkpoint["model_state_dict"])
+    encoder.eval()
+    return encoder, stats

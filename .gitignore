@@ -6,3 +6,5 @@ data/RE1/
 data/rcaeval_re1/
 *.egg-info/
 .vscode/
+models/
+.DS_Store
