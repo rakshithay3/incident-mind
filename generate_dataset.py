@@ -164,11 +164,14 @@ def wait_for_services_to_settle(services_config, timeout_sec=20):
                 all_settled = False
                 break
 
-            # 3. Check actual CPU metrics to ensure they are back to baseline
+            # 3. Check actual CPU and Memory metrics to ensure they are back to baseline
             cpu, mem = get_service_metrics(cfg["host"], cfg["port"])
-            # If CPU is successfully scraped, verify it is below the threshold. Ignore transient timeouts.
             if cpu is not None and cpu > 0.15:
                 all_settled = False
+                break
+            if mem is not None and mem > 0.30:
+                all_settled = False
+                print(f"  Service '{name}' still has elevated memory ({mem*100:.1f}% > 30%). Waiting for memory to settle...")
                 break
 
 

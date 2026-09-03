@@ -125,5 +125,7 @@ datasets/
 code-agent-history/
 datasets_compiled/
 *.zip
+!shopmind_evaluation_dataset.zip
 __pycache__/
 *.pyc
+scratch/

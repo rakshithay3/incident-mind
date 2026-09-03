@@ -26,7 +26,7 @@ FAULT_PRESETS = {
         "target": "auth-service",
         "type": "cpu_stress",
         "port": 3001,
-        "category": "Fast Recovery (<2s) — RECOMMENDED FOR LIVE AUDIENCES",
+        "category": "Instant Recovery (<1s) — RECOMMENDED FOR LIVE DEMOS",
         "duration": 20,
         "config": {}
     },
@@ -35,7 +35,7 @@ FAULT_PRESETS = {
         "target": "search-service",
         "type": "memory_pressure",
         "port": 3007,
-        "category": "Fast Recovery (<2s) — RECOMMENDED FOR LIVE AUDIENCES",
+        "category": "Extended Recovery (~5–10s) — Buffer Deallocation & GC Sweep",
         "duration": 20,
         "config": {}
     },
@@ -44,7 +44,7 @@ FAULT_PRESETS = {
         "target": "payment-service",
         "type": "network_delay",
         "port": 3004,
-        "category": "Extended Recovery (~10–15s) — Shows Upstream Latency Cascade",
+        "category": "Extended Recovery (~2–5s) — Shows Upstream Latency Cascade",
         "duration": 20,
         "config": {"delayMs": 2000}
     },

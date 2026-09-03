@@ -99,15 +99,15 @@ The validator writes an audit report verifying the health and validity of the te
 
 ```json
 {
-  "timestamp": "2026-07-08T14:30:20Z",
-  "experiment_id": "expr_test_001",
+  "timestamp": "2026-08-22T16:39:48Z",
   "validation_passed": true,
   "metrics_validation": {
     "auth-service": {
-      "cpu_vs_latency_spearman": 0.85,
-      "errors_vs_p99_spearman": 0.91,
-      "metrics_flatlined": false,
-      "insufficient_samples": false
+      "cpu_vs_latency_spearman": 0.453,
+      "cpu_vs_latency_insufficient_samples": false,
+      "errors_vs_p99_spearman": 0.0,
+      "errors_vs_p99_insufficient_samples": false,
+      "metrics_flatlined": false
     }
   },
   "graph_validation": {

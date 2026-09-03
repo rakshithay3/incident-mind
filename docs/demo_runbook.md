@@ -20,30 +20,30 @@ Before starting the demo, ensure Docker Desktop is running and verify that the b
 
 To prevent unexpected stalls or prolonged recovery times during a live presentation, choose your demo scenario deliberately based on audience time constraints:
 
-### 🟢 Recommended for Live Audiences: Fast Recovery (<2s)
+### 🟢 Recommended for Rapid Live Demos: Instant Recovery (<1s)
 1. **CPU Stress on `auth-service`**:
    - *Visual Impact*: Instant CPU spike to >90% on Prometheus. Request latencies increase moderately due to Node event-loop starvation.
-   - *Recovery*: **<1.0 second**. Immediate thread release upon reset.
-2. **Memory Pressure on `search-service`**:
-   - *Visual Impact*: Heap buffer allocations consume memory footprint smoothly.
-   - *Recovery*: **<1.0 second**. Buffer array is zeroed and Node garbage collection cleans memory instantly.
+   - *Recovery*: **0.19 seconds**. Immediate thread release upon reset.
 
-### 🟡 Extended Recovery (~10–15s): Causal Cascade Showcase
+### 🟡 Extended Recovery Scenarios: Causal & Resource Demonstrations
+2. **Memory Pressure on `search-service`**:
+   - *Visual Impact*: Heap buffer allocations consume memory footprint progressively.
+   - *Recovery*: **~5–10 seconds (Measured: 5.41s)**. Buffer array is zeroed and Node garbage collection sweeps memory.
 3. **Network Delay on `payment-service`**:
    - *Visual Impact*: Demonstrates **asymmetric RPC failure**. `order-service` (the upstream caller) hangs waiting for payment response and eventually aborts, while `payment-service` spans freeze.
-   - *Recovery*: **~2–10 seconds**. Queued socket retries must drain before Jaeger latency normalizes below 100ms.
+   - *Recovery*: **~2–5 seconds (Measured: 2.32s)**. Queued socket retries drain before Jaeger latency normalizes below 100ms.
 4. **Pod Crash on `inventory-service`**:
    - *Visual Impact*: Process exits with code 1. Storefront returns HTTP 500/Connection Refused. Docker auto-restart engine revives the container.
-   - *Recovery*: **~10–15 seconds**. Requires container restart, process re-initialization, and Prometheus reconnect.
+   - *Recovery*: **~10–15 seconds (Measured: 11.45s)**. Requires container restart, process re-initialization, and Prometheus reconnect.
 
 ### 📊 Empirical Recovery Benchmark (Measured Across Stack)
 The following table reflects real, automated measurements from `benchmark_demo_recovery.py`:
 
 | Preset | Fault Scenario | Target Service | Category | Measured Settle Time |
 | :--- | :--- | :--- | :--- | :--- |
-| **1** | **CPU Stress** | `auth-service` | Fast (<2s) | **0.19s** |
-| **2** | **Memory Pressure** | `search-service` | Fast (<2s) | **5.41s** (with GC buffer release) |
-| **3** | **Network Delay** | `payment-service` | Extended (~10–15s) | **2.32s** |
+| **1** | **CPU Stress** | `auth-service` | Instant (<1s) | **0.19s** |
+| **2** | **Memory Pressure** | `search-service` | Extended (~5–10s) | **5.41s** (with GC buffer release) |
+| **3** | **Network Delay** | `payment-service` | Extended (~2–5s) | **2.32s** |
 | **4** | **Pod Crash** | `inventory-service` | Extended (~10–15s) | **11.45s** (container reboot & ping) |
 
 ---
