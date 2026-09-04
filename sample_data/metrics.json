@@ -1,0 +1,46 @@
+{
+    "auth-service": {
+        "cpu_usage": {
+            "baseline": 42,
+            "current": 91
+        },
+        "memory_usage": {
+            "baseline": 48,
+            "current": 76
+        },
+        "request_latency_ms": {
+            "baseline": 120,
+            "current": 850
+        },
+        "error_rate_percent": {
+            "baseline": 0.5,
+            "current": 8.7
+        },
+        "requests_per_second": {
+            "baseline": 120,
+            "current": 65
+        }
+    },
+    "user-service": {
+        "cpu_usage": {
+            "baseline": 38,
+            "current": 44
+        },
+        "memory_usage": {
+            "baseline": 50,
+            "current": 53
+        },
+        "request_latency_ms": {
+            "baseline": 110,
+            "current": 130
+        },
+        "error_rate_percent": {
+            "baseline": 0.3,
+            "current": 0.6
+        },
+        "requests_per_second": {
+            "baseline": 115,
+            "current": 112
+        }
+    }
+}

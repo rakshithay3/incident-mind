@@ -1,0 +1,4 @@
+OLLAMA_MODEL = "llama3.2:3b"
+OLLAMA_HOST = "http://localhost:11434"
+
+TEMPERATURE = 0

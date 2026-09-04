@@ -1,0 +1,26 @@
+commit abc123
+Author: developer
+Message: Update authentication service connection handling
+
+diff --git a/auth-service/config.py b/auth-service/config.py
+index 123456..789012 100644
+--- a/auth-service/config.py
++++ b/auth-service/config.py
+@@ -10,7 +10,7 @@ DATABASE_CONFIG = {
+-    "connection_pool_size": 20,
++    "connection_pool_size": 5,
+     "timeout": 30
+ }
+
+diff --git a/auth-service/auth.py b/auth-service/auth.py
+index 456789..987654 100644
+--- a/auth-service/auth.py
++++ b/auth-service/auth.py
+@@ -25,8 +25,10 @@ def authenticate_user(user):
+-    connection = get_user_service_connection()
++    connection = get_user_service_connection(timeout=5)
+
+     if connection is None:
+-        return False
++        retry_connection()
++        return False
