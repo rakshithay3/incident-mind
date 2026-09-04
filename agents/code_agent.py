@@ -1,102 +1,92 @@
-import json
-import ollama
-
-from config import OLLAMA_MODEL, TEMPERATURE
-
-
-CODE_DIFF_FILE = "sample_data/code_diff.txt"
+import subprocess
+from config import OLLAMA_MODEL, OLLAMA_HOST, TEMPERATURE
+import requests
 
 
-def investigate(action):
-    """
-    Investigate recent code changes for a specific service.
+def get_git_diff():
+    """Get the latest code/config changes from Git."""
 
-    Args:
-        action (dict): DispatchAction containing agent_type
-                       and target_service.
-
-    Returns:
-        dict: Structured evidence produced by the Code Agent.
-    """
-
-    target_service = action["target_service"]
-
-    with open(CODE_DIFF_FILE, "r") as file:
-        code_diff = file.read()
-
-    prompt = f"""
-You are the Code Agent in an automated incident investigation system.
-
-Target service:
-{target_service}
-
-Analyze the following Git diff:
-
-{code_diff}
-
-Identify code changes that could be risky or could contribute to
-an incident affecting the target service.
-
-Pay particular attention to:
-- Configuration changes
-- Database changes
-- Authentication changes
-- Connection handling
-- Retry logic
-- API changes
-- Resource limits
-- Concurrency changes
-- Changes that could increase failures or reduce availability
-
-Return ONLY valid JSON using exactly this structure:
-
-{{
-    "finding": "short description of the main risky change",
-    "severity": "low, medium, or high",
-    "confidence": 0.0,
-    "evidence": [
-        "specific code change supporting the finding"
-    ]
-}}
-
-Rules:
-- Focus on the target service.
-- Do not invent code changes.
-- Evidence must come directly from the supplied Git diff.
-- Confidence must be between 0.0 and 1.0.
-- If there is no meaningful risky change, say so.
-"""
-
-    response = ollama.chat(
-        model=OLLAMA_MODEL,
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        options={
-            "temperature": TEMPERATURE
-        }
+    result = subprocess.run(
+        ["git", "diff", "HEAD~1", "HEAD"],
+        capture_output=True,
+        text=True
     )
 
-    content = response["message"]["content"]
+    if result.returncode != 0:
+        raise RuntimeError(f"Git diff failed: {result.stderr}")
+
+    return result.stdout
+
+
+def investigate(target_service):
+    """Investigate recent Git changes for a service."""
+
+    diff = get_git_diff()
+
+    if not diff.strip():
+        return {
+            "agent_type": "code",
+            "target_service": target_service,
+            "finding": "No recent code changes detected.",
+            "severity": "low",
+            "confidence": 0.9,
+            "evidence": []
+        }
+
+    prompt = f"""
+You are a code investigation agent in an incident investigation system.
+
+Target service: {target_service}
+
+Analyze the following Git diff.
+
+GIT DIFF:
+{diff}
+
+Determine whether the change could have contributed to an incident.
+
+Return ONLY valid JSON in this format:
+
+{{
+    "finding": "short explanation",
+    "severity": "low|medium|high",
+    "confidence": 0.0,
+    "evidence": ["specific evidence from the diff"]
+}}
+"""
+
+    response = requests.post(
+        f"{OLLAMA_HOST}/api/generate",
+        json={
+            "model": OLLAMA_MODEL,
+            "prompt": prompt,
+            "temperature": TEMPERATURE,
+            "stream": False
+        },
+        timeout=120
+    )
+
+    response.raise_for_status()
+
+    result = response.json()["response"]
+
+    import json
 
     try:
-        result = json.loads(content)
+        parsed = json.loads(result)
     except json.JSONDecodeError:
-        result = {
-            "finding": content,
-            "severity": "unknown",
-            "confidence": 0.0,
-            "evidence": []
+        parsed = {
+            "finding": result,
+            "severity": "medium",
+            "confidence": 0.5,
+            "evidence": [diff]
         }
 
     return {
         "agent_type": "code",
         "target_service": target_service,
-        "finding": result.get("finding", ""),
-        "severity": result.get("severity", ""),
-        "confidence": result.get("confidence", 0.0),
-        "evidence": result.get("evidence", [])
+        "finding": parsed.get("finding", ""),
+        "severity": parsed.get("severity", "medium"),
+        "confidence": parsed.get("confidence", 0.0),
+        "evidence": parsed.get("evidence", [])
     }
