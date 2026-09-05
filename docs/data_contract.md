@@ -136,3 +136,9 @@ When a `network_delay` (2s delay) is injected on a downstream service (e.g. `pay
 
 > [!IMPORTANT]
 > **Modeling Assumption**: For downstream `network_delay` faults, the ground-truth-labeled root cause node may exhibit healthy local telemetry features. The fault anomaly signature exists primarily on the caller/upstream node in the dependency graph. Graph-based GNN models must rely on multi-hop neighborhood aggregation to trace the root cause back to the target node.
+
+### Downstream Evaluation Unit Alignment (RCAEval RE1 Specification)
+To align with standard benchmark datasets (such as RCAEval RE1) and avoid distribution shifts in pre-trained GraphSAGE encoders, `package_evaluation.py` converts raw ShopMind telemetry units to the standard evaluation schema at the compilation boundary:
+- **`cpu`**: Transformed from $0.0–1.0$ ratio to **$0–100\%$** (`cpu = cpu_pct * 100.0`).
+- **`latency` / `p99_latency`**: Transformed from milliseconds to **seconds** (`latency = ms / 1000.0`).
+- **`memory`**: Reconstructed from usage ratio to **absolute bytes** (`memory = mem_pct * mem_limit_bytes`) using each container's configured `mem_limit` (e.g. 384MB for application microservices, 512MB for Postgres).
