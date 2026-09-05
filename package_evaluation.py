@@ -8,6 +8,39 @@ COMPILED_DIR = "datasets_compiled"
 ZIP_OUTPUT = "shopmind_evaluation_dataset.zip"
 SCHEDULE_FILE = "evaluation_schedule.json"
 
+# UNIT FIX (see diagnose_feature_scale.py results, Sept 2026):
+# ShopMind's exported units did not match RCAEval RE1's units, which silently
+# collapsed GNN scoring on ShopMind (PR@1 dropped from 0.92 on RE1 to 0.16 on
+# ShopMind). RE1's raw ranges (observed empirically from RCAEval RE1-OB):
+#   cpu:     0.24 - 97.0   -> percent (0-100 scale)
+#   latency: 0    - 9.9    -> seconds
+#   memory:  raw bytes     -> container_memory_usage_bytes
+# ShopMind was exporting:
+#   cpu_pct:         0 - 1        -> fraction (0-1 scale), needs x100
+#   mean_latency_ms: 0 - 2001     -> milliseconds, needs /1000
+#   mem_pct:         0 - 1        -> ratio, reconstructed as mem_pct * mem_limit_bytes
+CPU_RATIO_TO_PERCENT = 100.0
+MS_TO_SECONDS = 1.0 / 1000.0
+
+SERVICE_MEM_LIMIT_BYTES = {
+    "frontend": 128 * 1024 * 1024,
+    "api-gateway": 128 * 1024 * 1024,
+    "auth-service": 384 * 1024 * 1024,
+    "user-service": 384 * 1024 * 1024,
+    "order-service": 384 * 1024 * 1024,
+    "payment-service": 384 * 1024 * 1024,
+    "inventory-service": 384 * 1024 * 1024,
+    "notification-service": 384 * 1024 * 1024,
+    "search-service": 384 * 1024 * 1024,
+    "cache": 192 * 1024 * 1024,
+    "postgres-primary": 512 * 1024 * 1024,
+    "postgres-replica": 512 * 1024 * 1024,
+    "prometheus": 384 * 1024 * 1024,
+    "jaeger": 384 * 1024 * 1024,
+    "docker-socket-proxy": 64 * 1024 * 1024,
+}
+DEFAULT_MEM_LIMIT_BYTES = 384 * 1024 * 1024
+
 def get_baseline_averages(baseline_history):
     """Computes baseline average latency, cpu, and memory for all services."""
     sums = {}
@@ -157,14 +190,29 @@ def compile_incident(inc_dir):
         if err_rate is None:
             err_rate = find_last_known_good(srv_id, "error_rate", snap_idx, failure_history, baseline_history, 0.0)
         
+        # --- Unit conversion: ShopMind's raw export units -> RE1's units ---
+        # cpu_pct is a 0-1 ratio (process_cpu_usage_ratio); RE1's cpu column
+        # is a 0-100 percent. Multiply to match scale the model was trained on.
+        cpu = cpu * CPU_RATIO_TO_PERCENT
+
+        # mean_latency_ms / p99_latency_ms are milliseconds (Jaeger span
+        # duration_us / 1000.0); RE1's latency columns are seconds. Divide to match.
+        latency = latency * MS_TO_SECONDS
+        p99_lat = p99_lat * MS_TO_SECONDS
+
+        # memory: Reconstruct absolute bytes (mem_pct * configured mem_limit)
+        # to match RE1's container_memory_usage_bytes scale.
+        limit_bytes = SERVICE_MEM_LIMIT_BYTES.get(srv_id, DEFAULT_MEM_LIMIT_BYTES)
+        memory_bytes = memory * limit_bytes
+
         # Map values to the GNN schema expected by loader.py
         compiled_nodes.append({
             "service_id": srv_id,
-            "cpu": round(cpu, 4),
-            "memory": round(memory, 4),
+            "cpu": round(cpu, 4),               # now percent (0-100), matches RE1
+            "memory": round(memory_bytes, 2),   # now absolute bytes, matches RE1
             "error_rate": round(err_rate, 4),
-            "latency": round(latency, 2),
-            "p99_latency": round(p99_lat, 2),
+            "latency": round(latency, 4),       # now seconds, matches RE1
+            "p99_latency": round(p99_lat, 4),   # now seconds, matches RE1
             "label": 1 if srv_id == target else 0
         })
         
