@@ -142,3 +142,14 @@ To align with standard benchmark datasets (such as RCAEval RE1) and avoid distri
 - **`cpu`**: Transformed from $0.0–1.0$ ratio to **$0–100\%$** (`cpu = cpu_pct * 100.0`).
 - **`latency` / `p99_latency`**: Transformed from milliseconds to **seconds** (`latency = ms / 1000.0`).
 - **`memory`**: Reconstructed from usage ratio to **absolute bytes** (`memory = mem_pct * mem_limit_bytes`) using each container's configured `mem_limit` (e.g. 384MB for application microservices, 512MB for Postgres).
+
+### Pod Crash Fault Encoding (Offline Target State)
+When a `pod_crash` is injected, the target microservice process terminates (`process.exit(1)`). During the active outage window, HTTP probes to `/metrics` fail and the container cannot complete or return transaction spans.
+
+Rather than backfilling null metrics with pre-crash historical baseline values (which would disguise the crash as healthy idle behavior), `package_evaluation.py` encodes the active crash outage directly at the GNN contract boundary:
+- **`cpu`**: `0.0%` (process terminated).
+- **`memory`**: `0.0 bytes` (container dead).
+- **`latency` / `p99_latency`**: `0.0s` (no completed response spans emitted).
+- **`error_rate`**: `1.0` (100% failure rate: all inter-service RPC calls routed to the crashed container fail).
+
+This guarantees that GraphSAGE receives a distinct failure signature ($\approx +12\sigma$ on `error_rate`) cleanly differentiating a crashed node from an idle service.
