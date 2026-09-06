@@ -1,14 +1,24 @@
-"""Typed contracts shared across P1 modules and downstream consumers."""
+"""Typed contracts shared across P1 (GNN/PPO), P2 (LLM agents), and downstream
+consumers (Vismitha's dashboard).
+
+This is the single source of truth for DispatchAction / AgentType. Previously
+schemas/contracts.py (P2) defined its own TypedDict version of DispatchAction
+that was incompatible with this dataclass version -- P2 code should import
+from here instead of maintaining a separate copy.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional, Sequence, Tuple, TypedDict
 
 
 FEATURES = ("cpu", "memory", "latency", "error_rate", "p99_latency")
 DEFAULT_EMBEDDING_DIM = 128
+
+AgentType = Literal["log", "metrics", "code"]
+Severity = Literal["low", "medium", "high", "unknown"]
 
 
 @dataclass(frozen=True)
@@ -69,7 +79,14 @@ class NodeScore:
 
 @dataclass(frozen=True)
 class DispatchAction:
-    agent_type: str
+    """Request sent to a specialist agent (log/metrics/code).
+
+    Canonical version -- P2 agent code (pipeline.py, agents/*) should import
+    this instead of defining a separate TypedDict. Use attribute access
+    (action.agent_type), not dict access (action["agent_type"]).
+    """
+
+    agent_type: AgentType
     target_service: str
 
     def to_json(self) -> Dict[str, str]:
@@ -133,3 +150,55 @@ def precision_at_k(ranked_service_ids: Iterable[str], root_cause: Optional[str],
         return 0.0
     top_k = list(ranked_service_ids)[:k]
     return 1.0 if root_cause in top_k else 0.0
+
+
+# --------------------------------------------------------------------------
+# P2 agent / report types (originally schemas/contracts.py, Dharunya).
+# Moved here so DispatchAction/AgentType have exactly one definition. These
+# stay as TypedDicts since that's how agents/*.py and report_agent.py already
+# consume them -- only DispatchAction itself needed to become a dataclass for
+# compatibility with PPO's DispatchDecision output.
+# --------------------------------------------------------------------------
+
+
+class AgentFinding(TypedDict):
+    """Standard output from Log, Metrics, and Code agents."""
+
+    agent_type: AgentType
+    target_service: str
+    finding: str
+    severity: Severity
+    confidence: float
+    evidence: List[str]
+
+
+class EvidenceBundle(TypedDict):
+    """Collection of specialist-agent findings."""
+
+    findings: List[AgentFinding]
+
+
+class EvidenceSummary(TypedDict):
+    """Condensed evidence used by the Report Agent."""
+
+    agent_type: AgentType
+    summary: str
+
+
+class ReportText(TypedDict):
+    """Bilingual report text."""
+
+    en: str
+    hi: str
+
+
+class RCAReport(TypedDict):
+    """Final IncidentMind RCA report."""
+
+    incident_id: str
+    root_cause_service: str
+    confidence_score: float
+    evidence_summary: List[EvidenceSummary]
+    suggested_fix: str
+    estimated_blast_radius: List[str]
+    report_text: ReportText
