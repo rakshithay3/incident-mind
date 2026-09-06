@@ -82,10 +82,11 @@ def select_peak_anomaly_snapshot(failure_history, baseline_averages, target_serv
             srv = node["service_id"]
             base = baseline_averages.get(srv, {"cpu": 0.02, "memory": 0.1, "latency": 5.0})
             
+            is_down = (node.get("cpu_pct") is None and node.get("mem_pct") is None)
             curr_cpu = node.get("cpu_pct") or 0.0
             curr_mem = node.get("mem_pct") or 0.0
             curr_lat = node.get("mean_latency_ms") or 0.0
-            curr_err = node.get("error_rate") or 0.0
+            curr_err = 1.0 if is_down else (node.get("error_rate") or 0.0)
             
             # Anomaly score based on absolute deviations from baseline
             cpu_dev = max(0.0, curr_cpu - base["cpu"])
@@ -98,9 +99,9 @@ def select_peak_anomaly_snapshot(failure_history, baseline_averages, target_serv
 
             score += ((cpu_dev * 5.0) + (mem_dev * 5.0) + curr_err * 10.0 + (lat_dev * 0.1)) * w
                 
-            # If this is the target service of the crash, lack of metrics is anomalous
-            if srv == target_service and fault_type == "pod_crash" and (node.get("cpu_pct") is None or node.get("cpu_pct") == 0.0):
-                score += 50.0
+            # If the target service is actively down/unresponsive, that is the peak crash outage
+            if is_target and is_down:
+                score += 100.0
                 
         if score > max_score:
             max_score = score
@@ -164,46 +165,48 @@ def compile_incident(inc_dir):
         srv_id = node.get("service_id")
         base = baseline_averages.get(srv_id, {"cpu": 0.02, "memory": 0.1, "latency": 5.0})
         
-        # CPU (Coerce nulls)
-        cpu = node.get("cpu_pct")
-        if cpu is None:
-            cpu = find_last_known_good(srv_id, "cpu_pct", snap_idx, failure_history, baseline_history, base["cpu"])
-            
-        # Memory (Coerce nulls)
-        memory = node.get("mem_pct")
-        if memory is None:
-            memory = find_last_known_good(srv_id, "mem_pct", snap_idx, failure_history, baseline_history, base["memory"])
-            
-        # Latency (Coerce nulls)
-        latency = node.get("mean_latency_ms")
-        if latency is None:
-            latency = find_last_known_good(srv_id, "mean_latency_ms", snap_idx, failure_history, baseline_history, base["latency"])
-            
-        # P99 Latency (Coerce nulls)
-        p99_lat = node.get("p99_latency_ms")
-        if p99_lat is None:
-            p99_fallback = base["latency"] * 3.0 if base["latency"] > 0 else 20.0
-            p99_lat = find_last_known_good(srv_id, "p99_latency_ms", snap_idx, failure_history, baseline_history, p99_fallback)
-            
-        # Error Rate (Coerce nulls)
-        err_rate = node.get("error_rate")
-        if err_rate is None:
-            err_rate = find_last_known_good(srv_id, "error_rate", snap_idx, failure_history, baseline_history, 0.0)
+        # Check if this node is in a crashed state (offline / metrics scrape failed)
+        is_crashed = (fault == "pod_crash" and srv_id == target and node.get("cpu_pct") is None)
         
-        # --- Unit conversion: ShopMind's raw export units -> RE1's units ---
-        # cpu_pct is a 0-1 ratio (process_cpu_usage_ratio); RE1's cpu column
-        # is a 0-100 percent. Multiply to match scale the model was trained on.
-        cpu = cpu * CPU_RATIO_TO_PERCENT
+        if is_crashed:
+            # Crash encoding: Distinct from healthy "idle" state
+            # When a container crashes:
+            # - cpu: 0.0% (dead process)
+            # - memory: 0.0 bytes (no active allocation)
+            # - latency / p99_latency: 0.0s (no completed responses emitted)
+            # - error_rate: 1.0 (100% failure rate for all calls routed to it)
+            cpu = 0.0
+            memory_bytes = 0.0
+            latency = 0.0
+            p99_lat = 0.0
+            err_rate = 1.0
+        else:
+            # Standard telemetry extraction with last-known-good backfill
+            cpu = node.get("cpu_pct")
+            if cpu is None:
+                cpu = find_last_known_good(srv_id, "cpu_pct", snap_idx, failure_history, baseline_history, base["cpu"])
+            cpu = cpu * CPU_RATIO_TO_PERCENT
 
-        # mean_latency_ms / p99_latency_ms are milliseconds (Jaeger span
-        # duration_us / 1000.0); RE1's latency columns are seconds. Divide to match.
-        latency = latency * MS_TO_SECONDS
-        p99_lat = p99_lat * MS_TO_SECONDS
+            memory = node.get("mem_pct")
+            if memory is None:
+                memory = find_last_known_good(srv_id, "mem_pct", snap_idx, failure_history, baseline_history, base["memory"])
+            limit_bytes = SERVICE_MEM_LIMIT_BYTES.get(srv_id, DEFAULT_MEM_LIMIT_BYTES)
+            memory_bytes = memory * limit_bytes
 
-        # memory: Reconstruct absolute bytes (mem_pct * configured mem_limit)
-        # to match RE1's container_memory_usage_bytes scale.
-        limit_bytes = SERVICE_MEM_LIMIT_BYTES.get(srv_id, DEFAULT_MEM_LIMIT_BYTES)
-        memory_bytes = memory * limit_bytes
+            latency = node.get("mean_latency_ms")
+            if latency is None:
+                latency = find_last_known_good(srv_id, "mean_latency_ms", snap_idx, failure_history, baseline_history, base["latency"])
+            latency = latency * MS_TO_SECONDS
+
+            p99_lat = node.get("p99_latency_ms")
+            if p99_lat is None:
+                p99_fallback = base["latency"] * 3.0 if base["latency"] > 0 else 20.0
+                p99_lat = find_last_known_good(srv_id, "p99_latency_ms", snap_idx, failure_history, baseline_history, p99_fallback)
+            p99_lat = p99_lat * MS_TO_SECONDS
+
+            err_rate = node.get("error_rate")
+            if err_rate is None:
+                err_rate = find_last_known_good(srv_id, "error_rate", snap_idx, failure_history, baseline_history, 0.0)
 
         # Map values to the GNN schema expected by loader.py
         compiled_nodes.append({
