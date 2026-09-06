@@ -43,16 +43,16 @@ def investigate(action):
     Investigate logs for a target service.
 
     Input:
-        {
-            "agent_type": "log",
-            "target_service": "auth-service"
-        }
+        DispatchAction(
+            agent_type="log",
+            target_service="auth-service"
+        )
 
     Output:
         Structured evidence finding.
     """
 
-    target_service = action["target_service"]
+    target_service = action.target_service
 
     # Retrieve recent logs
     recent_logs = retrieve_logs(

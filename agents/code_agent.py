@@ -1,6 +1,8 @@
 import subprocess
-from config import OLLAMA_MODEL, OLLAMA_HOST, TEMPERATURE
+import json
 import requests
+
+from config import OLLAMA_MODEL, OLLAMA_HOST, TEMPERATURE
 
 
 def get_git_diff():
@@ -18,8 +20,11 @@ def get_git_diff():
     return result.stdout
 
 
-def investigate(target_service):
+def investigate(action):
     """Investigate recent Git changes for a service."""
+
+    # DispatchAction is a dataclass, so use attribute access.
+    target_service = action.target_service
 
     diff = get_git_diff()
 
@@ -69,8 +74,6 @@ Return ONLY valid JSON in this format:
     response.raise_for_status()
 
     result = response.json()["response"]
-
-    import json
 
     try:
         parsed = json.loads(result)

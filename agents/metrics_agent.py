@@ -12,12 +12,14 @@ def investigate(action):
     Investigate metrics for a specific service.
 
     Args:
-        target_service (str): Name of the service to investigate.
+        action (DispatchAction): Dispatch request containing
+        agent_type and target_service.
 
     Returns:
         dict: Structured evidence produced by the Metrics Agent.
     """
-    target_service = action["target_service"]
+
+    target_service = action.target_service
 
     with open(METRICS_FILE, "r") as file:
         all_metrics = json.load(file)

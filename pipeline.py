@@ -14,18 +14,18 @@ def validate_action(action: DispatchAction):
     Validate a DispatchAction before sending it to an agent.
     """
 
-    if "agent_type" not in action:
+    if not action.agent_type:
         raise ValueError("DispatchAction is missing 'agent_type'.")
 
-    if "target_service" not in action:
+    if not action.target_service:
         raise ValueError("DispatchAction is missing 'target_service'.")
 
-    if action["agent_type"] not in SUPPORTED_AGENTS:
+    if action.agent_type not in SUPPORTED_AGENTS:
         raise ValueError(
-            f"Unsupported agent type: {action['agent_type']}"
+            f"Unsupported agent type: {action.agent_type}"
         )
 
-    if not action["target_service"]:
+    if not action.target_service.strip():
         raise ValueError("target_service cannot be empty.")
 
 
@@ -36,7 +36,7 @@ def dispatch(action: DispatchAction):
 
     validate_action(action)
 
-    agent_type = action["agent_type"]
+    agent_type = action.agent_type
 
     if agent_type == "log":
         return investigate_logs(action)
