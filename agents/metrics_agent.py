@@ -99,7 +99,7 @@ Rules:
         "agent_type": "metrics",
         "target_service": target_service,
         "finding": result.get("finding", ""),
-        "severity": result.get("severity", ""),
+        "severity": result.get("severity", "unknown"),
         "confidence": result.get("confidence", 0.0),
         "evidence": result.get("evidence", [])
     }
