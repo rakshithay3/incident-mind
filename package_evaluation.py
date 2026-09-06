@@ -82,7 +82,7 @@ def select_peak_anomaly_snapshot(failure_history, baseline_averages, target_serv
             srv = node["service_id"]
             base = baseline_averages.get(srv, {"cpu": 0.02, "memory": 0.1, "latency": 5.0})
             
-            is_down = (node.get("cpu_pct") is None and node.get("mem_pct") is None)
+            is_down = (node.get("cpu_pct") is None)
             curr_cpu = node.get("cpu_pct") or 0.0
             curr_mem = node.get("mem_pct") or 0.0
             curr_lat = node.get("mean_latency_ms") or 0.0
