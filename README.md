@@ -93,3 +93,55 @@ if `data/RE1/RE1-OB` already exists.
 - The Online Boutique service dependency graph is hardcoded in
   `scripts/prepare_re1_data.py` (`ONLINE_BOUTIQUE_EDGES`) since RE1 does not
   ship topology data.
+
+## ShopMind Cross-Topology Evaluation
+
+ShopMind (Archie's 12-service Docker testbed) is a held-out generalization
+check only -- it is never used to fit `FeatureStats` or retrain GraphSAGE.
+The evaluation dataset (`shopmind_evaluation_dataset.zip`) is packaged on
+`archie/rakshithay3/incident-mind` and pulled locally, not committed here.
+
+```bash
+# 1. Pull and unzip the latest packaged ShopMind incidents
+git fetch origin archie/rakshithay3/incident-mind
+git show "origin/archie/rakshithay3/incident-mind:shopmind_evaluation_dataset.zip" \
+    > /tmp/shopmind_evaluation_dataset.zip
+unzip -o /tmp/shopmind_evaluation_dataset.zip -d ~/Desktop/shopmind_evaluation_dataset
+
+# 2. Sanity-check that ShopMind's raw feature scales still match RE1's after
+#    z-normalization with the RE1-fitted FeatureStats. Any row flagged
+#    "FAR FROM N(0,1)" means the GraphSAGE checkpoint is seeing
+#    out-of-distribution inputs -- fix the exporter before trusting any
+#    downstream number.
+python3 scripts/diagnose_feature_scale.py \
+    --re1-dataset data/rcaeval_re1 \
+    --shopmind-dataset ~/Desktop/shopmind_evaluation_dataset \
+    --graphsage-model models/graphsage.pt
+
+# 3. Run the full ShopMind evaluation (PPO vs Baseline C solve rate)
+python3 scripts/evaluate_shopmind.py \
+    --dataset ~/Desktop/shopmind_evaluation_dataset \
+    --model models/ppo_dispatch.zip \
+    --graphsage-model models/graphsage.pt
+
+# 4. Break solve rate down by hop-distance between the scorer's top-ranked
+#    node and the true root cause. This separates a genuine cross-topology /
+#    cascading-failure generalization limit (solve rate high at hop=0,
+#    dropping as hop-distance grows) from a lingering data/scale artifact
+#    (solve rate low even at hop=0).
+python3 scripts/diagnose_shopmind_failures.py \
+    --dataset ~/Desktop/shopmind_evaluation_dataset \
+    --model models/ppo_dispatch.zip \
+    --graphsage-model models/graphsage.pt
+```
+
+**Known data-contract gotchas (fixed in `archie/rakshithay3/incident-mind`
+commit `7d9c4f6`, tag `v1.0.0-eval-freeze`):** ShopMind's Prometheus export
+uses different units than RE1 for three of the five features. If
+`diagnose_feature_scale.py` flags any of these, check the exporter first:
+- `cpu`: fraction (0-1) instead of percent (0-100)
+- `latency` / `p99_latency`: milliseconds instead of seconds
+- `memory`: usage/limit ratio instead of raw bytes -- this one cannot be
+  fixed by a scale factor; it must be reconstructed as
+  `mem_pct * mem_limit_bytes` using the `mem_limit` values declared per
+  service in ShopMind's `docker-compose.yml`.
