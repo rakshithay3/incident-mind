@@ -10,10 +10,6 @@ SUPPORTED_AGENTS = {"log", "metrics", "code"}
 
 
 def validate_action(action: DispatchAction):
-    """
-    Validate a DispatchAction before sending it to an agent.
-    """
-
     if not action.agent_type:
         raise ValueError("DispatchAction is missing 'agent_type'.")
 
@@ -29,9 +25,12 @@ def validate_action(action: DispatchAction):
         raise ValueError("target_service cannot be empty.")
 
 
-def dispatch(action: DispatchAction):
+def dispatch(action: DispatchAction, telemetry_path=None):
     """
-    Route a DispatchAction to the appropriate specialist agent.
+    Dispatch a P1 DispatchAction to the appropriate P2 agent.
+
+    telemetry_path is optional. When provided, the Metrics Agent
+    uses ShopMind telemetry instead of sample_data/metrics.json.
     """
 
     validate_action(action)
@@ -42,23 +41,32 @@ def dispatch(action: DispatchAction):
         return investigate_logs(action)
 
     elif agent_type == "metrics":
-        return investigate_metrics(action)
+        return investigate_metrics(
+            action,
+            telemetry_path=telemetry_path
+        )
 
     elif agent_type == "code":
         return investigate_code(action)
 
-    raise ValueError(f"Unsupported agent type: {agent_type}")
+    raise ValueError(
+        f"Unsupported agent type: {agent_type}"
+    )
 
 
-def investigate_incident(actions):
+def investigate_incident(actions, telemetry_path=None):
     """
-    Run specialist agents and create an evidence bundle.
+    Run all dispatched agents and build the Evidence Bundle.
     """
 
     findings = []
 
     for action in actions:
-        result = dispatch(action)
+        result = dispatch(
+            action,
+            telemetry_path=telemetry_path
+        )
+
         findings.append(result)
 
     return {
@@ -66,24 +74,19 @@ def investigate_incident(actions):
     }
 
 
-def run_investigation(actions, incident_id="inc_001"):
+def run_investigation(
+    actions,
+    incident_id="inc_001",
+    telemetry_path=None
+):
     """
-    Run the complete IncidentMind investigation.
-
-    Flow:
-
-    DispatchAction
-        ↓
-    Specialist Agents
-        ↓
-    Evidence Bundle
-        ↓
-    Report Agent
-        ↓
-    Final RCA Report
+    Run the complete P2 investigation pipeline.
     """
 
-    evidence_bundle = investigate_incident(actions)
+    evidence_bundle = investigate_incident(
+        actions,
+        telemetry_path=telemetry_path
+    )
 
     report = generate_report(
         evidence_bundle,
