@@ -2,7 +2,6 @@ from agents.log_agent import investigate as investigate_logs
 from agents.metrics_agent import investigate as investigate_metrics
 from agents.code_agent import investigate as investigate_code
 from agents.report_agent import generate_report
-
 from schemas.contracts import DispatchAction
 
 
@@ -17,28 +16,22 @@ def validate_action(action: DispatchAction):
         raise ValueError("DispatchAction is missing 'target_service'.")
 
     if action.agent_type not in SUPPORTED_AGENTS:
-        raise ValueError(
-            f"Unsupported agent type: {action.agent_type}"
-        )
+        raise ValueError(f"Unsupported agent type: {action.agent_type}")
 
     if not action.target_service.strip():
         raise ValueError("target_service cannot be empty.")
 
 
-def dispatch(action: DispatchAction, telemetry_path=None):
-    """
-    Dispatch a P1 DispatchAction to the appropriate P2 agent.
-
-    telemetry_path is optional. When provided, the Metrics Agent
-    uses ShopMind telemetry instead of sample_data/metrics.json.
-    """
-
+def dispatch(action: DispatchAction, telemetry_path=None, log_path=None):
     validate_action(action)
 
     agent_type = action.agent_type
 
     if agent_type == "log":
-        return investigate_logs(action)
+        return investigate_logs(
+            action,
+            log_path=log_path
+        )
 
     elif agent_type == "metrics":
         return investigate_metrics(
@@ -49,22 +42,21 @@ def dispatch(action: DispatchAction, telemetry_path=None):
     elif agent_type == "code":
         return investigate_code(action)
 
-    raise ValueError(
-        f"Unsupported agent type: {agent_type}"
-    )
+    raise ValueError(f"Unsupported agent type: {agent_type}")
 
 
-def investigate_incident(actions, telemetry_path=None):
-    """
-    Run all dispatched agents and build the Evidence Bundle.
-    """
-
+def investigate_incident(
+    actions,
+    telemetry_path=None,
+    log_path=None
+):
     findings = []
 
     for action in actions:
         result = dispatch(
             action,
-            telemetry_path=telemetry_path
+            telemetry_path=telemetry_path,
+            log_path=log_path
         )
 
         findings.append(result)
@@ -77,15 +69,13 @@ def investigate_incident(actions, telemetry_path=None):
 def run_investigation(
     actions,
     incident_id="inc_001",
-    telemetry_path=None
+    telemetry_path=None,
+    log_path=None
 ):
-    """
-    Run the complete P2 investigation pipeline.
-    """
-
     evidence_bundle = investigate_incident(
         actions,
-        telemetry_path=telemetry_path
+        telemetry_path=telemetry_path,
+        log_path=log_path
     )
 
     report = generate_report(
