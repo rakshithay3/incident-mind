@@ -1,63 +1,122 @@
 import subprocess
 import json
+from pathlib import Path
+
 import requests
 
 from config import OLLAMA_MODEL, OLLAMA_HOST, TEMPERATURE
 
 
-def get_git_diff():
-    """Get the latest code/config changes from Git."""
+def get_git_diff(repo_path=None):
+    """Get the latest Git changes from the specified repository."""
+
+    cwd = Path(repo_path).resolve() if repo_path else None
 
     result = subprocess.run(
         ["git", "diff", "HEAD~1", "HEAD"],
+        cwd=cwd,
         capture_output=True,
         text=True
     )
 
     if result.returncode != 0:
-        raise RuntimeError(f"Git diff failed: {result.stderr}")
+        raise RuntimeError(
+            f"Git diff failed: {result.stderr}"
+        )
 
     return result.stdout
 
 
-def investigate(action):
-    """Investigate recent Git changes for a service."""
+def investigate(action, repo_path=None):
+    """
+    Investigate recent Git changes for a service.
 
-    # DispatchAction is a dataclass, so use attribute access.
+    repo_path can be used for ShopMind, for example:
+        repo_path="../shopmind"
+    """
+
     target_service = action.target_service
 
-    diff = get_git_diff()
+    diff = get_git_diff(repo_path)
 
+    # No changes at all.
     if not diff.strip():
         return {
             "agent_type": "code",
             "target_service": target_service,
-            "finding": "No recent code changes detected.",
+            "finding": "No recent code changes detected in the supplied repository.",
             "severity": "low",
             "confidence": 0.9,
             "evidence": []
         }
 
+    # Check whether the diff contains references to the target service.
+    target_tokens = {
+        target_service.lower(),
+        target_service.replace("-service", "").lower()
+    }
+
+    diff_lower = diff.lower()
+
+    relevant_to_service = any(
+        token and token in diff_lower
+        for token in target_tokens
+    )
+
+    # If the diff is unrelated to the target service,
+    # do NOT allow the LLM to invent a connection.
+    if not relevant_to_service:
+        return {
+            "agent_type": "code",
+            "target_service": target_service,
+            "finding": (
+                "Recent code changes were detected, but the supplied "
+                "diff does not contain evidence directly related to "
+                f"{target_service}."
+            ),
+            "severity": "low",
+            "confidence": 0.95,
+            "evidence": []
+        }
+
     prompt = f"""
-You are a code investigation agent in an incident investigation system.
+You are the Code Agent in an automated
+incident investigation system.
 
-Target service: {target_service}
+Target service:
+{target_service}
 
-Analyze the following Git diff.
+Analyze ONLY the following Git diff.
 
 GIT DIFF:
 {diff}
 
-Determine whether the change could have contributed to an incident.
+Determine whether the code changes could have
+contributed to an incident affecting {target_service}.
 
-Return ONLY valid JSON in this format:
+Return ONLY valid JSON:
 
 {{
     "finding": "short explanation",
     "severity": "low|medium|high",
     "confidence": 0.0,
-    "evidence": ["specific evidence from the diff"]
+    "evidence": [
+        "specific evidence directly from the diff"
+    ]
 }}
+
+Rules:
+
+1. Focus ONLY on {target_service}.
+2. Do not invent code changes.
+3. Evidence must come directly from the diff.
+4. Confidence must be between 0.0 and 1.0.
+5. Do not infer missing metrics, errors, or failures
+   unless explicitly shown in the diff.
+6. Do not claim that a code change caused an incident
+   unless the diff provides direct supporting evidence.
+7. If the change is potentially related but causality
+   is uncertain, explicitly say so.
 """
 
     response = requests.post(
@@ -73,23 +132,37 @@ Return ONLY valid JSON in this format:
 
     response.raise_for_status()
 
-    result = response.json()["response"]
+    result = response.json()["response"].strip()
+
+    # Remove markdown code fences.
+    if result.startswith("```"):
+        result = result.replace("```json", "", 1)
+        result = result.replace("```", "")
+        result = result.strip()
 
     try:
         parsed = json.loads(result)
+
     except json.JSONDecodeError:
         parsed = {
             "finding": result,
             "severity": "medium",
             "confidence": 0.5,
-            "evidence": [diff]
+            "evidence": []
         }
+
+    severity = str(
+        parsed.get("severity", "medium")
+    ).lower()
+
+    if severity not in {"low", "medium", "high"}:
+        severity = "medium"
 
     return {
         "agent_type": "code",
         "target_service": target_service,
         "finding": parsed.get("finding", ""),
-        "severity": parsed.get("severity", "medium"),
+        "severity": severity,
         "confidence": parsed.get("confidence", 0.0),
         "evidence": parsed.get("evidence", [])
     }
