@@ -684,24 +684,23 @@ STRICT RULES
     # ---------------------------------------------------------
 
     response = ollama.chat(
-        model=OLLAMA_MODEL,
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        options={
-            "temperature": TEMPERATURE
+    model=OLLAMA_MODEL,
+    messages=[
+        {
+            "role": "user",
+            "content": prompt
         }
-    )
+    ],
+    format="json",
+    options={
+        "temperature": TEMPERATURE
+    }
+)
 
     content = response["message"]["content"].strip()
-
-    # ---------------------------------------------------------
-    # Clean LLM response
-    # ---------------------------------------------------------
-
+    print("\n=== RAW REPORT AGENT RESPONSE ===")
+    print(content)
+    print("=== END RAW RESPONSE ===\n")
     content = _clean_json_response(content)
 
     # ---------------------------------------------------------
