@@ -1,0 +1,3 @@
+Injecting fault: cpu_stress for 30s
+Rolling back fault: cpu_stress
+Fault state cleanly reset.
