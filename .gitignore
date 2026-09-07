@@ -126,6 +126,7 @@ code-agent-history/
 datasets_compiled/
 *.zip
 !shopmind_evaluation_dataset.zip
+!demo_replay_auth_cpu.zip
 __pycache__/
 *.pyc
 scratch/

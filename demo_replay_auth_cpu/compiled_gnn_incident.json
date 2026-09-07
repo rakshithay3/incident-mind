@@ -1,0 +1,207 @@
+{
+  "incident_id": "demo_live_replay_auth_cpu",
+  "timestamp": 1788787195.3302534,
+  "nodes": [
+    {
+      "service_id": "frontend",
+      "cpu": 0.0,
+      "memory": 0.0,
+      "error_rate": 0.0,
+      "latency": 0.0,
+      "p99_latency": 0.0,
+      "label": 0
+    },
+    {
+      "service_id": "api-gateway",
+      "cpu": 0.0,
+      "memory": 0.0,
+      "error_rate": 0.0,
+      "latency": 0.0,
+      "p99_latency": 0.0,
+      "label": 0
+    },
+    {
+      "service_id": "auth-service",
+      "cpu": 28.99,
+      "memory": 40104257.13,
+      "error_rate": 0.0,
+      "latency": 0.0644,
+      "p99_latency": 0.511,
+      "label": 1
+    },
+    {
+      "service_id": "user-service",
+      "cpu": 1.15,
+      "memory": 41110890.09,
+      "error_rate": 0.0,
+      "latency": 0.0003,
+      "p99_latency": 0.001,
+      "label": 0
+    },
+    {
+      "service_id": "order-service",
+      "cpu": 3.31,
+      "memory": 40829032.86,
+      "error_rate": 0.0,
+      "latency": 0.0089,
+      "p99_latency": 0.018,
+      "label": 0
+    },
+    {
+      "service_id": "payment-service",
+      "cpu": 8.52,
+      "memory": 41755135.18,
+      "error_rate": 0.0,
+      "latency": 0.0009,
+      "p99_latency": 0.005,
+      "label": 0
+    },
+    {
+      "service_id": "inventory-service",
+      "cpu": 2.71,
+      "memory": 41110890.09,
+      "error_rate": 0.0,
+      "latency": 0.0013,
+      "p99_latency": 0.004,
+      "label": 0
+    },
+    {
+      "service_id": "notification-service",
+      "cpu": 0.89,
+      "memory": 43204686.64,
+      "error_rate": 0.0,
+      "latency": 0.0005,
+      "p99_latency": 0.001,
+      "label": 0
+    },
+    {
+      "service_id": "search-service",
+      "cpu": 1.04,
+      "memory": 39902930.53,
+      "error_rate": 0.0,
+      "latency": 0.0007,
+      "p99_latency": 0.001,
+      "label": 0
+    },
+    {
+      "service_id": "cache",
+      "cpu": 0.0,
+      "memory": 0.0,
+      "error_rate": 0.0,
+      "latency": 0.0,
+      "p99_latency": 0.0,
+      "label": 0
+    },
+    {
+      "service_id": "postgres-primary",
+      "cpu": 0.0,
+      "memory": 0.0,
+      "error_rate": 0.0,
+      "latency": 0.0,
+      "p99_latency": 0.0,
+      "label": 0
+    },
+    {
+      "service_id": "postgres-replica",
+      "cpu": 0.0,
+      "memory": 0.0,
+      "error_rate": 0.0,
+      "latency": 0.0,
+      "p99_latency": 0.0,
+      "label": 0
+    }
+  ],
+  "edges": [
+    {
+      "source": "frontend",
+      "target": "api-gateway",
+      "call_count": 25
+    },
+    {
+      "source": "api-gateway",
+      "target": "auth-service",
+      "call_count": 6
+    },
+    {
+      "source": "api-gateway",
+      "target": "user-service",
+      "call_count": 5
+    },
+    {
+      "source": "api-gateway",
+      "target": "order-service",
+      "call_count": 5
+    },
+    {
+      "source": "api-gateway",
+      "target": "search-service",
+      "call_count": 4
+    },
+    {
+      "source": "order-service",
+      "target": "payment-service",
+      "call_count": 4
+    },
+    {
+      "source": "order-service",
+      "target": "inventory-service",
+      "call_count": 4
+    },
+    {
+      "source": "order-service",
+      "target": "notification-service",
+      "call_count": 4
+    },
+    {
+      "source": "auth-service",
+      "target": "postgres-primary",
+      "call_count": 0
+    },
+    {
+      "source": "user-service",
+      "target": "postgres-primary",
+      "call_count": 0
+    },
+    {
+      "source": "order-service",
+      "target": "postgres-primary",
+      "call_count": 0
+    },
+    {
+      "source": "payment-service",
+      "target": "postgres-primary",
+      "call_count": 0
+    },
+    {
+      "source": "inventory-service",
+      "target": "postgres-primary",
+      "call_count": 0
+    },
+    {
+      "source": "search-service",
+      "target": "postgres-replica",
+      "call_count": 0
+    },
+    {
+      "source": "auth-service",
+      "target": "cache",
+      "call_count": 0
+    },
+    {
+      "source": "postgres-primary",
+      "target": "postgres-replica",
+      "call_count": 0
+    }
+  ],
+  "fault_injection": {
+    "active": true,
+    "fault_type": "cpu_stress",
+    "target_service": "auth-service",
+    "injected_at": 1788787194.8218634
+  },
+  "root_cause": "auth-service",
+  "metadata": {
+    "fault_type": "cpu_stress",
+    "dataset_version": "2026.07"
+  }
+}
