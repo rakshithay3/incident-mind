@@ -1,27 +1,26 @@
+from pathlib import Path
+
 from agents.log_agent import investigate as investigate_logs
 from agents.metrics_agent import investigate as investigate_metrics
 from agents.code_agent import investigate as investigate_code
 from agents.report_agent import generate_report
+
 from schemas.contracts import DispatchAction
-import json
-from pathlib import Path
 
 
 SUPPORTED_AGENTS = {"log", "metrics", "code"}
 
 
 def validate_action(action: DispatchAction):
-    """Validate a dispatch action before sending it to an agent."""
+    """
+    Validate a DispatchAction before sending it to an agent.
+    """
 
     if not action.agent_type:
-        raise ValueError(
-            "DispatchAction is missing 'agent_type'."
-        )
+        raise ValueError("DispatchAction is missing 'agent_type'.")
 
     if not action.target_service:
-        raise ValueError(
-            "DispatchAction is missing 'target_service'."
-        )
+        raise ValueError("DispatchAction is missing 'target_service'.")
 
     if action.agent_type not in SUPPORTED_AGENTS:
         raise ValueError(
@@ -29,66 +28,60 @@ def validate_action(action: DispatchAction):
         )
 
     if not action.target_service.strip():
-        raise ValueError(
-            "target_service cannot be empty."
-        )
+        raise ValueError("target_service cannot be empty.")
 
 
 def dispatch(
     action: DispatchAction,
     telemetry_path=None,
     log_path=None,
-    code_path=None
+    code_path=None,
 ):
     """
-    Dispatch an investigation action to the correct P2 agent.
+    Dispatch an investigation request to the appropriate P2 agent.
 
-    Parameters:
-        action:
-            P1 DispatchAction.
+    Log Agent:
+        Retrieves live Docker logs itself and falls back to
+        sample_data/logs.txt when Docker is unavailable.
 
-        telemetry_path:
-            Optional ShopMind telemetry_series.json path
-            used by Metrics Agent.
+    Metrics Agent:
+        Retrieves live service metrics itself and falls back to
+        sample_data/metrics.json when live telemetry is unavailable.
 
-        log_path:
-            Optional ShopMind log file path
-            used by Log Agent.
-
-        code_path:
-            Optional ShopMind repository path
-            used by Code Agent.
+    Code Agent:
+        Analyzes Git changes from the supplied repository path.
     """
 
     validate_action(action)
 
     agent_type = action.agent_type
 
-    # -------------------------
+    # ---------------------------------------------------------
     # LOG AGENT
-    # -------------------------
+    # ---------------------------------------------------------
     if agent_type == "log":
-        return investigate_logs(
-            action,
-            log_path=log_path
-        )
+        # The current Log Agent retrieves Docker logs internally.
+        # log_path is retained in the pipeline signature for
+        # backward compatibility but is not passed to investigate().
+        return investigate_logs(action)
 
-    # -------------------------
+    # ---------------------------------------------------------
     # METRICS AGENT
-    # -------------------------
+    # ---------------------------------------------------------
     elif agent_type == "metrics":
-        return investigate_metrics(
-            action,
-            telemetry_path=telemetry_path
-        )
+        # The current Metrics Agent retrieves live metrics internally.
+        # telemetry_path is retained for compatibility but is not
+        # passed because investigate() accepts only action.
+        return investigate_metrics(action)
 
-    # -------------------------
+    # ---------------------------------------------------------
     # CODE AGENT
-    # -------------------------
+    # ---------------------------------------------------------
     elif agent_type == "code":
+        # Code Agent supports an optional repo_path.
         return investigate_code(
             action,
-            repo_path=code_path
+            repo_path=code_path,
         )
 
     raise ValueError(
@@ -100,24 +93,21 @@ def investigate_incident(
     actions,
     telemetry_path=None,
     log_path=None,
-    code_path=None
+    code_path=None,
 ):
     """
-    Run all requested investigation actions.
-
-    Returns an Evidence Bundle containing
-    findings from Log, Metrics, and/or Code agents.
+    Run all requested investigation agents and combine
+    their findings into an Evidence Bundle.
     """
 
     findings = []
 
     for action in actions:
-
         result = dispatch(
             action,
             telemetry_path=telemetry_path,
             log_path=log_path,
-            code_path=code_path
+            code_path=code_path,
         )
 
         findings.append(result)
@@ -132,41 +122,72 @@ def run_investigation(
     incident_id="inc_001",
     telemetry_path=None,
     log_path=None,
-    code_path=None
+    code_path=None,
 ):
     """
-    Run the complete P2 investigation pipeline.
+    Run the complete IncidentMind investigation pipeline.
+
+    Flow:
+
+        DispatchAction
+              ↓
+        Investigation Agents
+        ┌────────┼────────┐
+        ↓        ↓        ↓
+       Log    Metrics    Code
+        └────────┼────────┘
+                 ↓
+          Evidence Bundle
+                 ↓
+            Report Agent
+                 ↓
+             RCA Report
+                 ↓
+        output/<incident_id>_report.json
+
+    The optional telemetry_path/log_path/code_path arguments are
+    retained for compatibility with existing tests and scripts.
     """
 
+    # ---------------------------------------------------------
+    # 1. Run investigation agents
+    # ---------------------------------------------------------
     evidence_bundle = investigate_incident(
         actions,
         telemetry_path=telemetry_path,
         log_path=log_path,
-        code_path=code_path
+        code_path=code_path,
     )
 
+    # ---------------------------------------------------------
+    # 2. Generate structured RCA report
+    # ---------------------------------------------------------
     report = generate_report(
         evidence_bundle,
-        incident_id=incident_id
+        incident_id=incident_id,
     )
 
-    # Save structured RCA report.
+    # ---------------------------------------------------------
+    # 3. Save structured RCA report
+    # ---------------------------------------------------------
     output_dir = Path("output")
     output_dir.mkdir(exist_ok=True)
 
     output_file = output_dir / f"{incident_id}_report.json"
+
+    import json
 
     with open(output_file, "w", encoding="utf-8") as file:
         json.dump(
             report,
             file,
             indent=2,
-            ensure_ascii=False
+            ensure_ascii=False,
         )
 
-    print(f"\nRCA report saved to: {output_file}")
+    print(f"RCA report saved to: {output_file}")
 
     return {
         "evidence_bundle": evidence_bundle,
-        "report": report
+        "report": report,
     }
