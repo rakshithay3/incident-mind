@@ -60,19 +60,19 @@ def dispatch(
     # LOG AGENT
     # ---------------------------------------------------------
     if agent_type == "log":
-        # The current Log Agent retrieves Docker logs internally.
-        # log_path is retained in the pipeline signature for
-        # backward compatibility but is not passed to investigate().
-        return investigate_logs(action)
+        # Pass log_path through so ShopMind incident replay actually
+        # reaches the agent instead of silently falling back to
+        # sample_data/logs.txt every time.
+        return investigate_logs(action, log_path=log_path)
 
     # ---------------------------------------------------------
     # METRICS AGENT
     # ---------------------------------------------------------
     elif agent_type == "metrics":
-        # The current Metrics Agent retrieves live metrics internally.
-        # telemetry_path is retained for compatibility but is not
-        # passed because investigate() accepts only action.
-        return investigate_metrics(action)
+        # Pass telemetry_path through so ShopMind incident replay
+        # actually reaches the agent instead of silently falling back
+        # to sample_data/metrics.json every time.
+        return investigate_metrics(action, telemetry_path=telemetry_path)
 
     # ---------------------------------------------------------
     # CODE AGENT
