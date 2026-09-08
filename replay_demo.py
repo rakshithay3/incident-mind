@@ -79,6 +79,75 @@ def find_last_known_good(service_id, field, history):
     return 0.0
 
 
+_ANOMALY_FIELD_WEIGHTS = {
+    # error_rate is ~0 at baseline for almost every service, so a small
+    # absolute move is highly significant -- weight it heavily. Latency is
+    # in ms, so it needs a small weight to stay comparable to cpu/mem pct.
+    "cpu_pct": 1.0,
+    "mem_pct": 1.0,
+    "error_rate": 10.0,
+    "mean_latency_ms": 0.01,
+    "p99_latency_ms": 0.01,
+}
+_CRASHED_NODE_SCORE = 10.0  # pod_crash (cpu_pct is None) is maximal anomaly
+
+
+def _compute_baseline_means(baseline_history):
+    """Per (service_id, field) mean over the baseline window, used as the
+    reference point for 'how anomalous is this snapshot'."""
+    sums, counts = {}, {}
+    for snapshot in baseline_history:
+        for node in snapshot.get("nodes", []):
+            sid = node.get("service_id")
+            for field in _ANOMALY_FIELD_WEIGHTS:
+                val = node.get(field)
+                if val is not None:
+                    key = (sid, field)
+                    sums[key] = sums.get(key, 0.0) + val
+                    counts[key] = counts.get(key, 0) + 1
+    return {key: sums[key] / counts[key] for key in sums}
+
+
+def _snapshot_anomaly_score(snapshot, baseline_means):
+    """Total weighted deviation from baseline, summed across ALL nodes --
+    not just the target service. network_delay's signal shows up on the
+    caller node rather than the target, so scoring only the target service
+    would miss the peak entirely for that fault type."""
+    score = 0.0
+    for node in snapshot.get("nodes", []):
+        sid = node.get("service_id")
+        if node.get("cpu_pct") is None:
+            score += _CRASHED_NODE_SCORE
+            continue
+        for field, weight in _ANOMALY_FIELD_WEIGHTS.items():
+            val = node.get(field)
+            if val is None:
+                continue
+            baseline = baseline_means.get((sid, field), 0.0)
+            score += weight * abs(val - baseline)
+    return score
+
+
+def find_peak_snapshot(telemetry):
+    """Return (peak_snapshot, index_in_failure_history) -- the snapshot in
+    failure_history with the largest total deviation from the baseline
+    window, i.e. the actual moment of peak anomaly, not just whatever was
+    captured last. By the time capture stops, a fault may have already
+    self-resolved, which is exactly what caused auth-service to fall out
+    of the top-5 ranking despite being the true root cause."""
+    failure_history = telemetry["failure_history"]
+    if len(failure_history) == 1:
+        return failure_history[0], 0
+
+    baseline_means = _compute_baseline_means(telemetry.get("baseline_history", []))
+    best_idx, best_score = 0, -1.0
+    for idx, snapshot in enumerate(failure_history):
+        score = _snapshot_anomaly_score(snapshot, baseline_means)
+        if score > best_score:
+            best_idx, best_score = idx, score
+    return failure_history[best_idx], best_idx
+
+
 def compile_live_snapshot(telemetry: dict) -> IncidentGraph:
     """Convert a raw telemetry_series.json (baseline_history + failure_history)
     into an IncidentGraph, using the SAME unit conversion and pod_crash
@@ -89,9 +158,14 @@ def compile_live_snapshot(telemetry: dict) -> IncidentGraph:
     failure_history = telemetry["failure_history"]
     baseline_history = telemetry.get("baseline_history", [])
 
-    # Use the last failure snapshot -- the peak of the incident.
-    last_snapshot = failure_history[-1]
-    all_history = baseline_history + failure_history
+    # Use the snapshot with peak anomaly deviation, NOT the last captured
+    # snapshot -- faults can self-resolve before capture stops, and scoring
+    # a recovered snapshot makes the true root cause look healthy.
+    last_snapshot, peak_idx = find_peak_snapshot(telemetry)
+    # Only backfill nulls from history up to and including the peak, so we
+    # never leak a "known good" value from AFTER the peak (which would
+    # itself be lookahead bias reintroducing the same class of bug).
+    all_history = baseline_history + failure_history[: peak_idx + 1]
 
     service_nodes = []
     for node in last_snapshot.get("nodes", []):
@@ -157,6 +231,8 @@ def main() -> None:
 
     print("[2/5] Compiling live snapshot for GraphSAGE scoring...")
     incident = compile_live_snapshot(telemetry)
+    n_snapshots = len(telemetry["failure_history"])
+    print(f"  scored snapshot: peak-anomaly ({n_snapshots} snapshots in failure_history)")
     for n in incident.nodes:
         if n.service_id == telemetry["target_service"]:
             print(f"  target ({n.service_id}) features: {dict(n.features)}")
