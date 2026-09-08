@@ -10,7 +10,14 @@ from config import OLLAMA_MODEL, OLLAMA_HOST, TEMPERATURE
 def get_git_diff(repo_path=None):
     """Get the latest Git changes from the specified repository."""
 
-    cwd = Path(repo_path).resolve() if repo_path else None
+    if not repo_path:
+        raise ValueError(
+            "get_git_diff() requires an explicit repo_path -- refusing to "
+            "fall back to the current working directory, since that risks "
+            "diffing an unrelated repo."
+        )
+
+    cwd = Path(repo_path).resolve()
 
     result = subprocess.run(
         ["git", "diff", "HEAD~1", "HEAD"],
@@ -36,6 +43,21 @@ def investigate(action, repo_path=None):
     """
 
     target_service = action.target_service
+    # No repo configured -- skip rather than silently diffing
+    # whatever directory the script happened to be launched from.
+    if not repo_path:
+        return {
+            "agent_type": "code",
+            "target_service": target_service,
+            "finding": (
+                "No code repository path was configured for this run -- "
+                "skipping Code Agent analysis rather than risk reporting "
+                "on the wrong codebase."
+            ),
+            "severity": "low",
+            "confidence": 1.0,
+            "evidence": []
+        }
 
     diff = get_git_diff(repo_path)
 
