@@ -260,7 +260,7 @@ def main() -> None:
 
     print("[4/5] Running live investigation (Ollama agents + report) using REAL captured evidence...")
     from schemas.contracts import DispatchAction
-    from p2_pipeline import run_investigation
+    from pipeline import run_investigation
 
     log_path = incident_dir / f"{top_service}.log"
     actions = [
