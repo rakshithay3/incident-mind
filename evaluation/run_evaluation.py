@@ -221,7 +221,7 @@ def main():
     # range(1, 101) -> incidents 001-100
     # -----------------------------------------------------
 
-    incidents_to_run = range(1, 7)
+    incidents_to_run = range(1, 101)
 
     total_to_run = len(
         incidents_to_run

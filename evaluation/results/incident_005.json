@@ -8490,8 +8490,8 @@
     "json_valid": true
   },
   "timing": {
-    "metrics_seconds": 11.39,
-    "report_seconds": 13.38,
-    "total_seconds": 24.77
+    "metrics_seconds": 11.45,
+    "report_seconds": 9.67,
+    "total_seconds": 21.11
   }
 }

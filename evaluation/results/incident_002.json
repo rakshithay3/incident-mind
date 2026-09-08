@@ -8491,8 +8491,8 @@
     "json_valid": true
   },
   "timing": {
-    "metrics_seconds": 11.6,
-    "report_seconds": 7.61,
-    "total_seconds": 19.21
+    "metrics_seconds": 11.3,
+    "report_seconds": 7.83,
+    "total_seconds": 19.13
   }
 }
