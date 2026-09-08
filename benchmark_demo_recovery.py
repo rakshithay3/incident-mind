@@ -8,6 +8,9 @@ import sys
 import time
 from demo_workflow import run_demo, FAULT_PRESETS
 
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
 def main():
     print("\n" + "=" * 75)
     print("       SHOPMIND EMPIRICAL DEMO RECOVERY BENCHMARK (ALL FAULT TYPES)")
@@ -45,7 +48,7 @@ def main():
 
     all_passed = all(r["success"] for r in results)
     if all_passed:
-        print("✓ All 4 demo scenarios benchmarked and verified successfully!")
+        print("[OK] All 4 demo scenarios benchmarked and verified successfully!")
         sys.exit(0)
     else:
         print("! One or more demo scenarios failed settling verification.")

@@ -18,6 +18,9 @@ import urllib.request
 import urllib.parse
 from reset_state import emergency_rollback, check_service_health
 
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
 SERVICES_FILE = "services.json"
 
 FAULT_PRESETS = {
@@ -145,7 +148,7 @@ def run_demo(fault_key="1", non_interactive=False):
         print("\n  [!] Cluster is not healthy. Executing emergency rollback first...")
         emergency_rollback(services)
 
-    print("  ✓ Baseline verified: All microservices UP and telemetry channels green.")
+    print("  [OK] Baseline verified: All microservices UP and telemetry channels green.")
 
     # ---------------------------------------------------------
     # STAGE 2: Storefront Checkout & Distributed Tracing
@@ -154,7 +157,7 @@ def run_demo(fault_key="1", non_interactive=False):
     print("  Dispatching customer checkout order through order-service (port 3003)...")
     ok, latency_ms, resp = send_checkout_transaction()
     if ok:
-        print(f"  ✓ Checkout Successful! Latency: {latency_ms:.1f}ms")
+        print(f"  [OK] Checkout Successful! Latency: {latency_ms:.1f}ms")
         print(f"    - Order ID   : {resp.get('order', {}).get('orderId', 'ord_demo_01')}")
         print(f"    - Stock Status: Confirmed by inventory-service")
         print(f"    - Payment    : Captured by payment-service")
@@ -183,7 +186,7 @@ def run_demo(fault_key="1", non_interactive=False):
     if not inj_ok:
         print(f"  [!] Fault injection notice: {inj_res}")
     else:
-        print(f"  ✓ Fault successfully active on {preset['target']}.")
+        print(f"  [OK] Fault successfully active on {preset['target']}.")
 
     # ---------------------------------------------------------
     # STAGE 4: Telemetry Cascade & GNN Feature Observation
