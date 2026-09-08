@@ -1,0 +1,73 @@
+{
+  "summary": {
+    "total_incidents": 6,
+    "correct_predictions": 5,
+    "accuracy": 0.8333333333333334,
+    "unknown_predictions": 0,
+    "unknown_rate": 0.0,
+    "valid_json_reports": 6,
+    "json_validity": 1.0
+  },
+  "incidents": [
+    {
+      "incident_id": "incident_001",
+      "target_service": "notification-service",
+      "fault_type": "cpu_stress",
+      "predicted_root_cause": "notification-service",
+      "confidence": 0.8,
+      "correct": true,
+      "unknown_prediction": false,
+      "json_valid": true
+    },
+    {
+      "incident_id": "incident_002",
+      "target_service": "auth-service",
+      "fault_type": "network_delay",
+      "predicted_root_cause": "auth-service",
+      "confidence": 0.8,
+      "correct": true,
+      "unknown_prediction": false,
+      "json_valid": true
+    },
+    {
+      "incident_id": "incident_003",
+      "target_service": "user-service",
+      "fault_type": "pod_crash",
+      "predicted_root_cause": "user-service",
+      "confidence": 0.8,
+      "correct": true,
+      "unknown_prediction": false,
+      "json_valid": true
+    },
+    {
+      "incident_id": "incident_004",
+      "target_service": "payment-service",
+      "fault_type": "memory_pressure",
+      "predicted_root_cause": "payment-service",
+      "confidence": 0.6,
+      "correct": true,
+      "unknown_prediction": false,
+      "json_valid": true
+    },
+    {
+      "incident_id": "incident_005",
+      "target_service": "notification-service",
+      "fault_type": "pod_crash",
+      "predicted_root_cause": "auth-service",
+      "confidence": 0.35,
+      "correct": false,
+      "unknown_prediction": false,
+      "json_valid": true
+    },
+    {
+      "incident_id": "incident_006",
+      "target_service": "auth-service",
+      "fault_type": "memory_pressure",
+      "predicted_root_cause": "auth-service",
+      "confidence": 0.6,
+      "correct": true,
+      "unknown_prediction": false,
+      "json_valid": true
+    }
+  ]
+}
