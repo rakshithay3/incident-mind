@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ShopMind | Next-Gen Microservice Storefront</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             /* Default: Vibrant Midnight Nebula */
@@ -12,7 +12,7 @@
             --surface: #101738;
             --surface-card: #151e47;
             --surface-hover: #1e2a63;
-            --border: rgba(99, 102, 241, 0.2);
+            --border: rgba(99, 102, 241, 0.22);
             --border-glow: rgba(99, 102, 241, 0.45);
             --primary: #6366f1;
             --primary-glow: rgba(99, 102, 241, 0.45);
@@ -24,7 +24,7 @@
             --text: #f8fafc;
             --text-muted: #cbd5e1;
             --text-dim: #818cf8;
-            --card-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+            --card-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
             --header-bg: rgba(9, 14, 36, 0.88);
         }
 
@@ -94,31 +94,54 @@
                 radial-gradient(circle at 85% 75%, rgba(139, 92, 246, 0.24) 0%, transparent 45%);
         }
 
-        /* ☀️ Modern Clean Light Mode */
+        /* ☀️ Modern Cool Slate (Light Theme 1) */
         body.theme-light {
-            --bg: #f1f5f9;
+            --bg: #f8fafc;
             --surface: #ffffff;
             --surface-card: #ffffff;
-            --surface-hover: #e2e8f0;
-            --border: rgba(0, 0, 0, 0.1);
-            --border-glow: rgba(37, 99, 235, 0.4);
+            --surface-hover: #f1f5f9;
+            --border: rgba(148, 163, 184, 0.25);
+            --border-glow: rgba(37, 99, 235, 0.45);
             --primary: #2563eb;
-            --primary-glow: rgba(37, 99, 235, 0.3);
+            --primary-glow: rgba(37, 99, 235, 0.25);
             --text: #0f172a;
             --text-muted: #475569;
             --text-dim: #64748b;
-            --card-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
-            --header-bg: rgba(255, 255, 255, 0.9);
+            --card-shadow: 0 12px 30px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04);
+            --header-bg: rgba(255, 255, 255, 0.92);
             background-image: 
-                radial-gradient(circle at 10% 10%, rgba(37, 99, 235, 0.1) 0%, transparent 40%),
-                radial-gradient(circle at 90% 90%, rgba(147, 51, 234, 0.08) 0%, transparent 40%);
+                radial-gradient(circle at 10% 10%, rgba(37, 99, 235, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 90%, rgba(147, 51, 234, 0.06) 0%, transparent 40%);
+        }
+
+        /* 🥂 Warm Luxury Champagne / Pearl Ivory (Light Theme 2) */
+        body.theme-champagne {
+            --bg: #faf6ef;
+            --surface: #ffffff;
+            --surface-card: #ffffff;
+            --surface-hover: #f5ede0;
+            --border: rgba(180, 115, 45, 0.2);
+            --border-glow: rgba(217, 119, 6, 0.45);
+            --primary: #d97706;
+            --primary-glow: rgba(217, 119, 6, 0.35);
+            --accent-cyan: #0284c7;
+            --accent-purple: #c026d3;
+            --text: #1c1917;
+            --text-muted: #57534e;
+            --text-dim: #8c827a;
+            --card-shadow: 0 14px 34px rgba(180, 120, 60, 0.1), 0 2px 8px rgba(0, 0, 0, 0.04);
+            --header-bg: rgba(250, 246, 239, 0.93);
+            background-image: 
+                radial-gradient(circle at 12% 14%, rgba(217, 119, 6, 0.12) 0%, transparent 45%),
+                radial-gradient(circle at 88% 78%, rgba(245, 158, 11, 0.10) 0%, transparent 45%),
+                radial-gradient(circle at 50% 50%, rgba(254, 243, 199, 0.45) 0%, transparent 60%);
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+            transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
         }
 
         body {
@@ -130,7 +153,7 @@
             background-attachment: fixed;
         }
 
-        /* Navbar */
+        /* Navbar Header */
         header {
             position: sticky;
             top: 0;
@@ -138,11 +161,18 @@
             backdrop-filter: blur(18px);
             background: var(--header-bg);
             border-bottom: 1px solid var(--border);
-            padding: 1rem 2rem;
+            padding: 0.85rem 2rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 1.5rem;
+            gap: 1.2rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        .brand-section {
+            display: flex;
+            align-items: center;
+            gap: 1.2rem;
         }
 
         .brand {
@@ -180,6 +210,40 @@
             -webkit-text-fill-color: transparent;
         }
 
+        body.theme-champagne .brand-title {
+            background: linear-gradient(135deg, #78350f, #b45309, #d97706);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .cluster-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.28);
+            color: var(--success);
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        .pulse-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 8px #10b981;
+            animation: pulseAnim 2s infinite ease-in-out;
+        }
+
+        @keyframes pulseAnim {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.35); opacity: 0.6; }
+        }
+
         .search-bar {
             flex: 1;
             max-width: 440px;
@@ -195,6 +259,7 @@
             color: var(--text);
             font-size: 0.9rem;
             outline: none;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
         }
 
         .search-bar input:focus {
@@ -209,23 +274,25 @@
             transform: translateY(-50%);
             color: var(--text-dim);
             pointer-events: none;
+            font-size: 0.9rem;
         }
 
         .header-actions {
             display: flex;
             align-items: center;
-            gap: 0.6rem;
+            gap: 0.65rem;
         }
 
-        /* Theme Palette Picker */
+        /* Theme Palette Picker (6 Themes) */
         .theme-picker {
             display: flex;
             align-items: center;
-            gap: 0.35rem;
+            gap: 0.4rem;
             background: var(--surface);
-            padding: 0.35rem 0.6rem;
+            padding: 0.35rem 0.65rem;
             border-radius: 9999px;
             border: 1px solid var(--border);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
 
         .theme-picker span {
@@ -237,26 +304,32 @@
         }
 
         .palette-dot {
-            width: 18px;
-            height: 18px;
+            width: 19px;
+            height: 19px;
             border-radius: 50%;
             cursor: pointer;
             border: 2px solid transparent;
-            transition: transform 0.2s, border-color 0.2s;
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s;
         }
 
         .palette-dot:hover {
-            transform: scale(1.2);
+            transform: scale(1.25);
         }
 
         .palette-dot.active {
-            border-color: #fff;
-            transform: scale(1.15);
-            box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+            border-color: #ffffff;
+            transform: scale(1.18);
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
         }
 
         body.theme-light .palette-dot.active {
             border-color: #0f172a;
+            box-shadow: 0 0 8px rgba(15, 23, 42, 0.3);
+        }
+
+        body.theme-champagne .palette-dot.active {
+            border-color: #78350f;
+            box-shadow: 0 0 8px rgba(120, 53, 15, 0.4);
         }
 
         .nav-btn {
@@ -284,18 +357,19 @@
             background: linear-gradient(135deg, var(--primary), var(--accent-purple));
             color: #fff;
             border: none;
-            box-shadow: 0 0 16px var(--primary-glow);
+            box-shadow: 0 4px 16px var(--primary-glow);
+            font-weight: 700;
         }
 
         .cart-badge {
             background: #ef4444;
             color: white;
-            font-size: 0.7rem;
+            font-size: 0.72rem;
             font-weight: 800;
-            padding: 0.15rem 0.45rem;
+            padding: 0.15rem 0.5rem;
             border-radius: 9999px;
             margin-left: 0.3rem;
-            box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.7);
         }
 
         /* Hero Banner */
@@ -308,8 +382,8 @@
         .hero-card {
             background: var(--surface-card);
             border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 2rem 2.5rem;
+            border-radius: 22px;
+            padding: 2.2rem 2.6rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -322,20 +396,46 @@
         .hero-card::after {
             content: '';
             position: absolute;
-            top: -50%;
+            top: -60%;
             right: -20%;
-            width: 450px;
-            height: 450px;
+            width: 500px;
+            height: 500px;
             background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
             border-radius: 50%;
             pointer-events: none;
         }
 
-        .hero-text h2 {
-            font-size: 1.8rem;
+        .hero-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.75rem;
             font-weight: 800;
-            letter-spacing: -0.02em;
-            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--primary);
+            background: rgba(99, 102, 241, 0.12);
+            padding: 0.3rem 0.75rem;
+            border-radius: 9999px;
+            margin-bottom: 0.8rem;
+            border: 1px solid var(--border);
+        }
+
+        body.theme-champagne .hero-eyebrow {
+            background: rgba(217, 119, 6, 0.12);
+            color: #b45309;
+        }
+
+        body.theme-light .hero-eyebrow {
+            background: rgba(37, 99, 235, 0.1);
+            color: #2563eb;
+        }
+
+        .hero-text h2 {
+            font-size: 1.95rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            margin-bottom: 0.6rem;
             background: linear-gradient(to right, var(--text), var(--text-muted));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -344,13 +444,13 @@
         .hero-text p {
             color: var(--text-muted);
             font-size: 0.95rem;
-            max-width: 650px;
-            line-height: 1.5;
+            max-width: 680px;
+            line-height: 1.6;
         }
 
         .hero-stats {
             display: flex;
-            gap: 1.5rem;
+            gap: 1.8rem;
             z-index: 1;
         }
 
@@ -361,33 +461,34 @@
         }
 
         .stat-val {
-            font-size: 1.5rem;
+            font-size: 1.6rem;
             font-weight: 800;
             color: var(--primary);
             font-family: 'JetBrains Mono', monospace;
         }
 
         .stat-lbl {
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             color: var(--text-dim);
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.06em;
+            font-weight: 700;
             margin-top: 0.2rem;
         }
 
-        /* Filter Chips */
+        /* Filter Chips Bar */
         .filters {
             max-width: 1400px;
             margin: 1.5rem auto 0;
             padding: 0 2rem;
             display: flex;
             align-items: center;
-            gap: 0.6rem;
+            gap: 0.65rem;
             overflow-x: auto;
         }
 
         .filter-chip {
-            padding: 0.5rem 1.1rem;
+            padding: 0.55rem 1.15rem;
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 9999px;
@@ -396,19 +497,22 @@
             color: var(--text-muted);
             cursor: pointer;
             white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
         }
 
         .filter-chip:hover, .filter-chip.active {
             background: var(--surface-card);
             border-color: var(--primary);
             color: var(--text);
-            box-shadow: 0 0 12px var(--primary-glow);
+            box-shadow: 0 0 14px var(--primary-glow);
         }
 
-        /* Main Workspace */
+        /* Main Workspace Grid */
         main {
             max-width: 1400px;
-            margin: 1.5rem auto 4rem;
+            margin: 1.6rem auto 4rem;
             padding: 0 2rem;
             display: grid;
             grid-template-columns: 1fr 340px;
@@ -422,139 +526,228 @@
             }
         }
 
-        /* Product Grid */
+        /* Product Cards Grid */
         .products-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
             gap: 1.5rem;
         }
 
         .product-card {
             background: var(--surface-card);
             border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 1.3rem;
+            border-radius: 20px;
+            padding: 1.4rem;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             position: relative;
             box-shadow: var(--card-shadow);
-            transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+            transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.28s, box-shadow 0.28s;
         }
 
         .product-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-6px);
             border-color: var(--border-glow);
-            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.3), 0 0 20px var(--primary-glow);
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25), 0 0 22px var(--primary-glow);
+        }
+
+        body.theme-light .product-card:hover,
+        body.theme-champagne .product-card:hover {
+            box-shadow: 0 18px 36px rgba(0, 0, 0, 0.12), 0 0 18px var(--primary-glow);
         }
 
         .card-top {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 1rem;
+            margin-bottom: 1.1rem;
         }
 
         .product-icon-wrap {
-            width: 52px;
-            height: 52px;
-            border-radius: 14px;
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
             background: var(--surface-hover);
             border: 1px solid var(--border);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.6rem;
+            font-size: 1.8rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transition: transform 0.25s ease;
+        }
+
+        .product-card:hover .product-icon-wrap {
+            transform: scale(1.08) rotate(3deg);
+        }
+
+        .card-badges {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.35rem;
+        }
+
+        .badge-highlight {
+            font-size: 0.65rem;
+            font-weight: 800;
+            padding: 0.2rem 0.6rem;
+            border-radius: 9999px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .badge-gold {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+        }
+
+        .badge-purple {
+            background: linear-gradient(135deg, #a855f7, #7c3aed);
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(168, 85, 247, 0.4);
+        }
+
+        .badge-blue {
+            background: linear-gradient(135deg, #06b6d4, #2563eb);
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+        }
+
+        .badge-green {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
         }
 
         .badge-stock {
-            font-size: 0.7rem;
+            font-size: 0.68rem;
             font-weight: 700;
-            padding: 0.25rem 0.55rem;
+            padding: 0.18rem 0.5rem;
             border-radius: 9999px;
             background: rgba(16, 185, 129, 0.12);
             color: var(--success);
             border: 1px solid rgba(16, 185, 129, 0.25);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .badge-stock-dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--success);
         }
 
         .product-meta {
-            margin-bottom: 1.2rem;
+            margin-bottom: 1.1rem;
         }
 
         .product-category {
             font-size: 0.72rem;
             text-transform: uppercase;
-            font-weight: 700;
-            letter-spacing: 0.05em;
+            font-weight: 800;
+            letter-spacing: 0.08em;
             color: var(--primary);
-            margin-bottom: 0.3rem;
+            margin-bottom: 0.35rem;
         }
 
         .product-name {
             font-size: 1.05rem;
             font-weight: 700;
             color: var(--text);
-            margin-bottom: 0.4rem;
+            margin-bottom: 0.45rem;
             line-height: 1.35;
         }
 
-        .product-desc {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            line-height: 1.4;
+        .product-features {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+            margin: 0.6rem 0;
+        }
+
+        .feature-tag {
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            background: var(--surface);
+            padding: 0.18rem 0.45rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
         }
 
         .product-rating {
             display: flex;
             align-items: center;
-            gap: 0.3rem;
+            gap: 0.35rem;
             font-size: 0.75rem;
             color: var(--warning);
-            margin-top: 0.5rem;
-            font-weight: 600;
+            margin-top: 0.4rem;
+            font-weight: 700;
         }
 
         .product-rating span {
             color: var(--text-dim);
-            font-weight: 400;
+            font-weight: 500;
         }
 
         .card-bottom {
             display: flex;
             flex-direction: column;
-            gap: 0.75rem;
+            gap: 0.85rem;
             border-top: 1px solid var(--border);
             padding-top: 1rem;
         }
 
-        .price-row {
+        .price-container {
             display: flex;
             justify-content: space-between;
             align-items: baseline;
         }
 
+        .price-main {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+        }
+
         .product-price {
-            font-size: 1.35rem;
+            font-size: 1.4rem;
             font-weight: 800;
             color: var(--text);
             font-family: 'JetBrains Mono', monospace;
         }
 
-        .product-price small {
-            font-size: 0.75rem;
+        .original-price {
+            font-size: 0.82rem;
             color: var(--text-dim);
-            font-weight: 400;
+            text-decoration: line-through;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .save-pill {
+            font-size: 0.68rem;
+            font-weight: 800;
+            color: #10b981;
+            background: rgba(16, 185, 129, 0.12);
+            padding: 0.15rem 0.45rem;
+            border-radius: 6px;
+            border: 1px solid rgba(16, 185, 129, 0.25);
         }
 
         .btn-group {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1.1fr 0.9fr;
             gap: 0.5rem;
         }
 
         .btn-cart {
             padding: 0.65rem 0.5rem;
-            border-radius: 10px;
+            border-radius: 11px;
             background: var(--surface-hover);
             border: 1px solid var(--border);
             color: var(--text);
@@ -570,11 +763,18 @@
         .btn-cart:hover {
             border-color: var(--primary);
             color: var(--primary);
+            background: var(--surface);
+        }
+
+        .btn-cart.in-cart {
+            border-color: var(--success);
+            color: var(--success);
+            background: rgba(16, 185, 129, 0.08);
         }
 
         .btn-buy-now {
             padding: 0.65rem 0.5rem;
-            border-radius: 10px;
+            border-radius: 11px;
             background: linear-gradient(135deg, var(--primary), var(--accent-purple));
             border: none;
             color: #fff;
@@ -585,7 +785,12 @@
             align-items: center;
             justify-content: center;
             gap: 0.35rem;
-            box-shadow: 0 4px 12px var(--primary-glow);
+            box-shadow: 0 4px 14px var(--primary-glow);
+        }
+
+        .btn-buy-now:hover {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
         }
 
         /* Sidebar: Chaos & Event Panel */
@@ -598,38 +803,38 @@
         .side-card {
             background: var(--surface-card);
             border: 1px solid var(--border);
-            border-radius: 18px;
+            border-radius: 20px;
             padding: 1.4rem;
             box-shadow: var(--card-shadow);
         }
 
         .side-card-title {
             font-size: 0.95rem;
-            font-weight: 700;
+            font-weight: 800;
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.4rem;
             color: var(--text);
         }
 
         .side-card-desc {
             font-size: 0.78rem;
             color: var(--text-muted);
-            margin-bottom: 1.2rem;
-            line-height: 1.4;
+            margin-bottom: 1.1rem;
+            line-height: 1.45;
         }
 
         .form-group {
-            margin-bottom: 1rem;
+            margin-bottom: 0.95rem;
         }
 
         .form-group label {
             display: block;
-            font-size: 0.75rem;
-            font-weight: 600;
+            font-size: 0.72rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.04em;
+            letter-spacing: 0.05em;
             color: var(--text-dim);
             margin-bottom: 0.35rem;
         }
@@ -650,10 +855,20 @@
             border-color: var(--primary);
         }
 
+        body.theme-light .search-bar input,
+        body.theme-light .form-group select,
+        body.theme-light .form-group input,
+        body.theme-champagne .search-bar input,
+        body.theme-champagne .form-group select,
+        body.theme-champagne .form-group input {
+            background: #ffffff;
+            color: var(--text);
+        }
+
         .btn-inject {
             width: 100%;
             padding: 0.75rem;
-            border-radius: 10px;
+            border-radius: 11px;
             background: linear-gradient(135deg, #dc2626, #ef4444);
             color: #fff;
             border: none;
@@ -667,19 +882,35 @@
             box-shadow: 0 4px 16px rgba(239, 68, 68, 0.35);
         }
 
+        .btn-inject:hover {
+            filter: brightness(1.1);
+        }
+
         /* Live Terminal */
         .terminal-box {
             background: var(--bg);
             border: 1px solid var(--border);
-            border-radius: 12px;
+            border-radius: 14px;
             padding: 0.85rem;
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.72rem;
-            max-height: 220px;
+            max-height: 230px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 0.3rem;
+            gap: 0.35rem;
+        }
+
+        body.theme-light .terminal-box {
+            background: #f1f5f9;
+            border-color: rgba(148, 163, 184, 0.3);
+            color: #0f172a;
+        }
+
+        body.theme-champagne .terminal-box {
+            background: #f5ede1;
+            border-color: rgba(180, 115, 45, 0.25);
+            color: #1c1917;
         }
 
         .terminal-entry {
@@ -691,6 +922,7 @@
         .time-tag {
             color: var(--text-dim);
             flex-shrink: 0;
+            font-weight: 600;
         }
 
         /* Slide-Out Cart Drawer */
@@ -716,10 +948,10 @@
             right: 0;
             bottom: 0;
             width: 100%;
-            max-width: 440px;
+            max-width: 450px;
             background: var(--surface);
             border-left: 1px solid var(--border);
-            box-shadow: -10px 0 40px rgba(0, 0, 0, 0.7);
+            box-shadow: -12px 0 44px rgba(0, 0, 0, 0.6);
             z-index: 101;
             display: flex;
             flex-direction: column;
@@ -732,7 +964,7 @@
         }
 
         .cart-header {
-            padding: 1.5rem;
+            padding: 1.4rem 1.6rem;
             border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
@@ -761,10 +993,22 @@
             justify-content: center;
         }
 
+        .free-shipping-bar {
+            background: rgba(16, 185, 129, 0.12);
+            border-bottom: 1px solid rgba(16, 185, 129, 0.25);
+            padding: 0.65rem 1.6rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
         .cart-items-list {
             flex: 1;
             overflow-y: auto;
-            padding: 1.2rem 1.5rem;
+            padding: 1.2rem 1.6rem;
             display: flex;
             flex-direction: column;
             gap: 1rem;
@@ -773,23 +1017,25 @@
         .cart-item {
             background: var(--surface-card);
             border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 1rem;
+            border-radius: 16px;
+            padding: 1rem 1.1rem;
             display: flex;
             gap: 1rem;
             align-items: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
         }
 
         .cart-item-icon {
-            font-size: 1.6rem;
-            width: 44px;
-            height: 44px;
-            border-radius: 10px;
+            font-size: 1.8rem;
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
             background: var(--surface-hover);
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+            border: 1px solid var(--border);
         }
 
         .cart-item-info {
@@ -804,14 +1050,20 @@
             overflow: hidden;
             text-overflow: ellipsis;
             color: var(--text);
-            margin-bottom: 0.2rem;
+            margin-bottom: 0.25rem;
         }
 
         .cart-item-price {
-            font-size: 0.85rem;
+            font-size: 0.88rem;
             font-family: 'JetBrains Mono', monospace;
             color: var(--primary);
             font-weight: 700;
+        }
+
+        .cart-item-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
         }
 
         .cart-item-stepper {
@@ -821,7 +1073,7 @@
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 0.2rem 0.4rem;
+            padding: 0.2rem 0.45rem;
         }
 
         .step-btn {
@@ -830,25 +1082,43 @@
             color: var(--text-muted);
             cursor: pointer;
             font-weight: 800;
-            font-size: 0.95rem;
+            font-size: 1rem;
             padding: 0 0.3rem;
         }
 
+        .step-btn:hover {
+            color: var(--primary);
+        }
+
         .step-qty {
-            font-size: 0.8rem;
+            font-size: 0.82rem;
             font-weight: 700;
             font-family: 'JetBrains Mono', monospace;
-            min-width: 14px;
+            min-width: 16px;
             text-align: center;
         }
 
+        .btn-remove-item {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 0.95rem;
+            padding: 0.2rem;
+            transition: color 0.2s;
+        }
+
+        .btn-remove-item:hover {
+            color: var(--danger);
+        }
+
         .cart-footer {
-            padding: 1.5rem;
+            padding: 1.4rem 1.6rem;
             border-top: 1px solid var(--border);
             background: var(--surface);
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.85rem;
         }
 
         .summary-row {
@@ -859,7 +1129,7 @@
         }
 
         .summary-row.total {
-            font-size: 1.15rem;
+            font-size: 1.2rem;
             font-weight: 800;
             color: var(--text);
             padding-top: 0.5rem;
@@ -874,7 +1144,7 @@
         .btn-checkout-all {
             width: 100%;
             padding: 0.95rem;
-            border-radius: 12px;
+            border-radius: 13px;
             background: linear-gradient(135deg, var(--primary), var(--accent-purple));
             border: none;
             color: #fff;
@@ -885,7 +1155,13 @@
             align-items: center;
             justify-content: center;
             gap: 0.6rem;
-            box-shadow: 0 6px 20px var(--primary-glow);
+            box-shadow: 0 6px 22px var(--primary-glow);
+            transition: transform 0.2s ease, filter 0.2s ease;
+        }
+
+        .btn-checkout-all:hover:not(:disabled) {
+            transform: translateY(-1px);
+            filter: brightness(1.08);
         }
 
         .btn-checkout-all:disabled {
@@ -895,13 +1171,13 @@
 
         .empty-cart-state {
             text-align: center;
-            padding: 3rem 1rem;
+            padding: 3.5rem 1.5rem;
             color: var(--text-dim);
         }
 
         .empty-cart-state .empty-icon {
-            font-size: 3rem;
-            margin-bottom: 0.75rem;
+            font-size: 3.2rem;
+            margin-bottom: 0.8rem;
             opacity: 0.5;
         }
 
@@ -930,16 +1206,16 @@
             background: var(--surface);
             border: 1px solid var(--border-glow);
             border-radius: 24px;
-            padding: 2.2rem;
-            max-width: 480px;
+            padding: 2.4rem;
+            max-width: 490px;
             width: 100%;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 40px var(--primary-glow);
             text-align: center;
         }
 
         .modal-success-icon {
-            width: 64px;
-            height: 64px;
+            width: 68px;
+            height: 68px;
             border-radius: 50%;
             background: rgba(16, 185, 129, 0.15);
             color: var(--success);
@@ -947,13 +1223,13 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2rem;
+            font-size: 2.2rem;
             margin: 0 auto 1.2rem;
-            box-shadow: 0 0 24px rgba(16, 185, 129, 0.4);
+            box-shadow: 0 0 26px rgba(16, 185, 129, 0.4);
         }
 
         .modal-title {
-            font-size: 1.4rem;
+            font-size: 1.45rem;
             font-weight: 800;
             margin-bottom: 0.4rem;
             color: var(--text);
@@ -968,14 +1244,14 @@
         .modal-details {
             background: var(--surface-card);
             border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 1rem 1.2rem;
+            border-radius: 16px;
+            padding: 1.1rem 1.3rem;
             margin-bottom: 1.5rem;
             text-align: left;
             font-size: 0.82rem;
             display: flex;
             flex-direction: column;
-            gap: 0.6rem;
+            gap: 0.65rem;
         }
 
         .modal-detail-row {
@@ -1001,11 +1277,12 @@
             border: none;
             color: #fff;
             font-weight: 700;
-            font-size: 0.9rem;
+            font-size: 0.92rem;
             cursor: pointer;
+            box-shadow: 0 4px 16px var(--primary-glow);
         }
 
-        /* Toast notification */
+        /* Floating Toast */
         .toast {
             position: fixed;
             bottom: 2rem;
@@ -1013,16 +1290,16 @@
             transform: translateX(-50%) translateY(100px);
             background: var(--surface-card);
             border: 1px solid var(--border-glow);
-            padding: 0.75rem 1.5rem;
+            padding: 0.8rem 1.6rem;
             border-radius: 9999px;
             color: var(--text);
             font-size: 0.85rem;
-            font-weight: 600;
+            font-weight: 700;
             display: flex;
             align-items: center;
-            gap: 0.6rem;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(10px);
+            gap: 0.65rem;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(12px);
             z-index: 300;
             transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
             opacity: 0;
@@ -1039,28 +1316,35 @@
 
     <!-- Header Navigation -->
     <header>
-        <a href="/" class="brand">
-            <div class="brand-logo">⚡</div>
-            <div>
-                <div class="brand-title">ShopMind</div>
-                <div style="font-size: 0.68rem; color: var(--text-dim); text-transform: uppercase; font-weight: 700; letter-spacing: 0.06em;">Enterprise Microservice Testbed</div>
+        <div class="brand-section">
+            <a href="/" class="brand">
+                <div class="brand-logo">⚡</div>
+                <div>
+                    <div class="brand-title">ShopMind</div>
+                    <div style="font-size: 0.68rem; color: var(--text-dim); text-transform: uppercase; font-weight: 700; letter-spacing: 0.06em;">Enterprise Microservice Sandbox</div>
+                </div>
+            </a>
+            <div class="cluster-pill" title="Live Kubernetes/Docker Microservices Status">
+                <span class="pulse-dot"></span>
+                <span>15 Containers Online</span>
             </div>
-        </a>
+        </div>
 
         <div class="search-bar">
             <span class="search-icon">🔍</span>
-            <input type="text" id="search-input" placeholder="Search keyboards, headphones, displays..." oninput="handleSearch(this.value)">
+            <input type="text" id="search-input" placeholder="Search keyboards, headphones, 4K displays..." oninput="handleSearch(this.value)">
         </div>
 
         <div class="header-actions">
-            <!-- Background Theme Palette Switcher -->
-            <div class="theme-picker" title="Change Background Palette">
-                <span>Theme</span>
-                <div class="palette-dot active" style="background: linear-gradient(135deg, #090e24, #6366f1);" onclick="setTheme('theme-nebula', this)" title="Midnight Nebula"></div>
-                <div class="palette-dot" style="background: linear-gradient(135deg, #050d1e, #06b6d4);" onclick="setTheme('theme-cyber', this)" title="Cyber Royal Navy"></div>
-                <div class="palette-dot" style="background: linear-gradient(135deg, #041410, #10b981);" onclick="setTheme('theme-aurora', this)" title="Emerald Aurora"></div>
-                <div class="palette-dot" style="background: linear-gradient(135deg, #110720, #d946ef);" onclick="setTheme('theme-amethyst', this)" title="Royal Amethyst"></div>
-                <div class="palette-dot" style="background: linear-gradient(135deg, #f1f5f9, #2563eb);" onclick="setTheme('theme-light', this)" title="Clean Light Mode"></div>
+            <!-- 6-Theme Palette Switcher -->
+            <div class="theme-picker" title="Change Theme Palette">
+                <span>🎨</span>
+                <div class="palette-dot active" style="background: linear-gradient(135deg, #090e24, #6366f1);" onclick="setTheme('theme-nebula', this)" title="Midnight Nebula (Dark)"></div>
+                <div class="palette-dot" style="background: linear-gradient(135deg, #050d1e, #06b6d4);" onclick="setTheme('theme-cyber', this)" title="Cyber Royal Navy (Dark)"></div>
+                <div class="palette-dot" style="background: linear-gradient(135deg, #041410, #10b981);" onclick="setTheme('theme-aurora', this)" title="Emerald Aurora (Dark)"></div>
+                <div class="palette-dot" style="background: linear-gradient(135deg, #110720, #d946ef);" onclick="setTheme('theme-amethyst', this)" title="Royal Amethyst (Dark)"></div>
+                <div class="palette-dot" style="background: linear-gradient(135deg, #f8fafc, #2563eb);" onclick="setTheme('theme-light', this)" title="Cool Slate (Clean Light)"></div>
+                <div class="palette-dot" style="background: linear-gradient(135deg, #faf6ef, #d97706);" onclick="setTheme('theme-champagne', this)" title="Warm Luxury Champagne (Rich Light)"></div>
             </div>
 
             <a href="/dashboard.html" target="_blank" class="nav-btn">
@@ -1080,8 +1364,9 @@
     <section class="hero-banner">
         <div class="hero-card">
             <div class="hero-text">
-                <h2>High-Performance Tech Workstation Gear</h2>
-                <p>Curated gear running on our live 12-microservice distributed architecture. Add multiple items to your cart, test checkout sagas, and observe live distributed trace spans.</p>
+                <div class="hero-eyebrow">✨ Next-Gen Microservice Storefront</div>
+                <h2>Curated High-Performance Workstation Hardware</h2>
+                <p>Enterprise gear powered by our live 12-microservice distributed cluster. Add multiple items to cart, test distributed sagas, inject chaos faults, and inspect live trace spans in Jaeger.</p>
             </div>
             <div class="hero-stats">
                 <div class="stat-box">
@@ -1090,11 +1375,11 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-val">16</div>
-                    <div class="stat-lbl">Call Edges</div>
+                    <div class="stat-lbl">Service Edges</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-val">&lt;20ms</div>
-                    <div class="stat-lbl">Avg Latency</div>
+                    <div class="stat-val">&lt;18ms</div>
+                    <div class="stat-lbl">P99 Latency</div>
                 </div>
             </div>
         </div>
@@ -1102,11 +1387,11 @@
 
     <!-- Category Filters -->
     <div class="filters">
-        <div class="filter-chip active" onclick="filterCategory('all', this)">All Items</div>
+        <div class="filter-chip active" onclick="filterCategory('all', this)">🌟 All Catalog Items (16)</div>
         <div class="filter-chip" onclick="filterCategory('keyboard', this)">⌨️ Keyboards & Mice</div>
-        <div class="filter-chip" onclick="filterCategory('audio', this)">🎧 Audio & Studio</div>
-        <div class="filter-chip" onclick="filterCategory('display', this)">🖥️ Displays & Tablets</div>
-        <div class="filter-chip" onclick="filterCategory('power', this)">⚡ Power & Accessories</div>
+        <div class="filter-chip" onclick="filterCategory('audio', this)">🎧 Audio & Studio Sound</div>
+        <div class="filter-chip" onclick="filterCategory('display', this)">🖥️ 4K Displays & Tablets</div>
+        <div class="filter-chip" onclick="filterCategory('power', this)">⚡ GaN Power & Gear</div>
     </div>
 
     <!-- Main Workspace -->
@@ -1126,7 +1411,7 @@
                     <span>⚡ Live Chaos Injector</span>
                 </div>
                 <div class="side-card-desc">
-                    Programmatically inject perturbations into any running microservice to simulate production outages.
+                    Programmatically inject real-time faults into any microservice container to trigger production outages and evaluate automated RCA.
                 </div>
 
                 <div class="form-group">
@@ -1135,10 +1420,10 @@
                         <option value="auth-service">auth-service (:3001) - Auth/JWT</option>
                         <option value="payment-service">payment-service (:3004) - Razorpay</option>
                         <option value="inventory-service">inventory-service (:3005) - Warehouse</option>
-                        <option value="order-service">order-service (:3003) - Saga</option>
-                        <option value="search-service">search-service (:3007) - Catalog</option>
-                        <option value="user-service">user-service (:3002) - Profiles</option>
-                        <option value="notification-service">notification-service (:3006) - SMS</option>
+                        <option value="order-service">order-service (:3003) - Saga Orchestrator</option>
+                        <option value="search-service">search-service (:3007) - Catalog Search</option>
+                        <option value="user-service">user-service (:3002) - User Profiles</option>
+                        <option value="notification-service">notification-service (:3006) - Dispatcher</option>
                     </select>
                 </div>
 
@@ -1148,7 +1433,7 @@
                         <option value="cpu_stress">CPU Stress (Spin-loop compute starvation)</option>
                         <option value="memory_pressure">Memory Pressure (Heap buffer exhaustion)</option>
                         <option value="network_delay">Network Delay (Asymmetric +2000ms delay)</option>
-                        <option value="pod_crash">Pod Crash (Process exit & auto-reboot)</option>
+                        <option value="pod_crash">Pod Crash (Process kill & container reboot)</option>
                     </select>
                 </div>
 
@@ -1158,7 +1443,7 @@
                 </div>
 
                 <button class="btn-inject" onclick="injectChaos()">
-                    <span>🔥 Inject Chaos Scenario</span>
+                    <span>🔥 Inject Live Chaos Outage</span>
                 </button>
             </div>
 
@@ -1168,12 +1453,12 @@
                     <span>📡 Inter-Service Telemetry Bus</span>
                 </div>
                 <div class="side-card-desc">
-                    Live HTTP and OpenTelemetry span transitions recorded across containers.
+                    Live HTTP, saga coordination, and OpenTelemetry trace logs recorded across containers.
                 </div>
                 <div class="terminal-box" id="terminal">
                     <div class="terminal-entry">
                         <span class="time-tag">[INIT]</span>
-                        <span style="color: var(--primary);">Cluster online: 15 containers verified.</span>
+                        <span style="color: var(--primary);">Cluster online: 15 containers verified healthy.</span>
                     </div>
                 </div>
             </div>
@@ -1186,6 +1471,11 @@
         <div class="cart-header">
             <h3><span>🛒 Your Shopping Cart</span></h3>
             <button class="close-btn" onclick="toggleCart()">✕</button>
+        </div>
+
+        <div class="free-shipping-bar">
+            <span>🚚</span>
+            <span><strong>FREE Express Courier Shipping</strong> unlocked on your order!</span>
         </div>
 
         <div class="cart-items-list" id="cart-items-container">
@@ -1202,7 +1492,7 @@
                 <span id="cart-tax" style="font-family: 'JetBrains Mono', monospace; color: var(--text-dim);">₹0</span>
             </div>
             <div class="summary-row">
-                <span>Express Shipping</span>
+                <span>Express Courier Shipping</span>
                 <span style="color: var(--success); font-weight: 700;">FREE</span>
             </div>
             <div class="summary-row total">
@@ -1246,8 +1536,8 @@
             </div>
 
             <button class="modal-btn" onclick="closeModal()">Continue Shopping</button>
-            <div style="margin-top: 0.8rem;">
-                <a href="http://localhost:16686" target="_blank" style="font-size: 0.78rem; color: var(--primary); text-decoration: none;">
+            <div style="margin-top: 0.9rem;">
+                <a href="http://localhost:16686" target="_blank" style="font-size: 0.78rem; color: var(--primary); text-decoration: none; font-weight: 600;">
                     Inspect trace waterfall in Jaeger ↗
                 </a>
             </div>
@@ -1261,7 +1551,7 @@
     </div>
 
     <script>
-        // Theme Switching Logic
+        // 6-Theme Palette Management
         const setTheme = (themeName, el) => {
             document.body.className = themeName;
             document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active'));
@@ -1275,31 +1565,111 @@
         window.addEventListener('DOMContentLoaded', () => {
             const dots = document.querySelectorAll('.palette-dot');
             dots.forEach(d => {
-                if (d.getAttribute('onclick').includes(savedTheme)) {
+                if (d.getAttribute('onclick') && d.getAttribute('onclick').includes(savedTheme)) {
                     dots.forEach(o => o.classList.remove('active'));
                     d.classList.add('active');
                 }
             });
         });
 
-        // Product Metadata Enhancements (Icons, Categories)
+        // Rich Product Metadata (Icons, Badges, Features, Original Prices)
         const productMetadata = {
-            'p1': { icon: '⌨️', category: 'keyboard', rating: '4.9', reviews: 248, tag: 'Mechanical' },
-            'p2': { icon: '🖱️', category: 'keyboard', rating: '4.8', reviews: 412, tag: 'Ergonomic' },
-            'p3': { icon: '🎧', category: 'audio', rating: '4.9', reviews: 890, tag: 'Active ANC' },
-            'p4': { icon: '🎛️', category: 'power', rating: '4.7', reviews: 154, tag: 'Studio Deck' },
-            'p5': { icon: '💡', category: 'power', rating: '4.6', reviews: 98, tag: 'RGB Smart' },
-            'p6': { icon: '⚡', category: 'power', rating: '4.7', reviews: 180, tag: 'Fast Wireless' },
-            'p7': { icon: '📱', category: 'display', rating: '4.9', reviews: 620, tag: 'Apple Silicon' },
-            'p8': { icon: '🖥️', category: 'display', rating: '4.8', reviews: 310, tag: '4K IPS HDR' },
-            'p9': { icon: '🔋', category: 'power', rating: '4.9', reviews: 215, tag: '140W GaN' },
-            'p10': { icon: '⌨️', category: 'keyboard', rating: '4.7', reviews: 140, tag: 'OmniPoint' },
-            'p11': { icon: '🖱️', category: 'keyboard', rating: '4.8', reviews: 95, tag: '30K Optical' },
-            'p12': { icon: '🎵', category: 'audio', rating: '4.8', reviews: 175, tag: 'Immersive ANC' },
-            'p13': { icon: '🎙️', category: 'audio', rating: '5.0', reviews: 520, tag: 'Cardioid XLR' },
-            'p14': { icon: '🖥️', category: 'display', rating: '4.9', reviews: 88, tag: '360Hz Fast IPS' },
-            'p15': { icon: '🎒', category: 'power', rating: '4.9', reviews: 340, tag: 'Weatherproof' },
-            'p16': { icon: '💺', category: 'power', rating: '5.0', reviews: 780, tag: 'Postural Ergonomics' }
+            'p1': { 
+                icon: '⌨️', category: 'keyboard', rating: '4.9', reviews: 248, 
+                badge: 'BESTSELLER', badgeClass: 'badge-gold',
+                features: ['Wireless / USB-C', 'Gateron G-Pro', 'Mac & Win'], 
+                originalPrice: 9999, stock: 'In Stock'
+            },
+            'p2': { 
+                icon: '🖱️', category: 'keyboard', rating: '4.8', reviews: 412, 
+                badge: 'POPULAR', badgeClass: 'badge-blue',
+                features: ['MagSpeed Wheel', '8K DPI Sensor', 'Quiet Clicks'], 
+                originalPrice: 12999, stock: 'In Stock'
+            },
+            'p3': { 
+                icon: '🎧', category: 'audio', rating: '4.9', reviews: 890, 
+                badge: 'STAFF PICK', badgeClass: 'badge-purple',
+                features: ['Auto NC Optimizer', '30hr Battery', 'Hi-Res LDAC'], 
+                originalPrice: 34999, stock: 'In Stock'
+            },
+            'p4': { 
+                icon: '🎛️', category: 'power', rating: '4.7', reviews: 154, 
+                badge: 'STUDIO PRO', badgeClass: 'badge-blue',
+                features: ['15 LCD Keys', 'Custom Profiles', 'OBS / Twitch'], 
+                originalPrice: 17499, stock: 'In Stock'
+            },
+            'p5': { 
+                icon: '💡', category: 'power', rating: '4.6', reviews: 98, 
+                badge: 'HOT DEAL', badgeClass: 'badge-green',
+                features: ['16M Colors', 'Voice Sync', 'Zigbee + BT'], 
+                originalPrice: 5999, stock: 'In Stock'
+            },
+            'p6': { 
+                icon: '⚡', category: 'power', rating: '4.7', reviews: 180, 
+                badge: 'FAST CHARGE', badgeClass: 'badge-gold',
+                features: ['MagSafe 15W', 'Watch Fast Charge', 'Qi2 Certified'], 
+                originalPrice: 14499, stock: 'In Stock'
+            },
+            'p7': { 
+                icon: '📱', category: 'display', rating: '4.9', reviews: 620, 
+                badge: 'TOP RATED', badgeClass: 'badge-purple',
+                features: ['Liquid Retina', 'M1 Architecture', 'Pencil Gen 2'], 
+                originalPrice: 62900, stock: 'In Stock'
+            },
+            'p8': { 
+                icon: '🖥️', category: 'display', rating: '4.8', reviews: 310, 
+                badge: 'COLOR PRO', badgeClass: 'badge-blue',
+                features: ['4K IPS Black', '90W USB-C Hub', '100% sRGB'], 
+                originalPrice: 44999, stock: 'In Stock'
+            },
+            'p9': { 
+                icon: '🔋', category: 'power', rating: '4.9', reviews: 215, 
+                badge: 'HEAVY DUTY', badgeClass: 'badge-green',
+                features: ['140W GaNPrime', 'Smart Display', '24,000mAh'], 
+                originalPrice: 15999, stock: 'In Stock'
+            },
+            'p10': { 
+                icon: '⌨️', category: 'keyboard', rating: '4.7', reviews: 140, 
+                badge: 'ESPORTS', badgeClass: 'badge-gold',
+                features: ['OmniPoint 2.0', 'OLED Smart Screen', 'Aircraft Alu'], 
+                originalPrice: 22999, stock: 'In Stock'
+            },
+            'p11': { 
+                icon: '🖱️', category: 'keyboard', rating: '4.8', reviews: 95, 
+                badge: 'ULTRA LIGHT', badgeClass: 'badge-green',
+                features: ['63g Ultralight', 'Focus Pro 30K', '90hr Battery'], 
+                originalPrice: 16499, stock: 'In Stock'
+            },
+            'p12': { 
+                icon: '🎵', category: 'audio', rating: '4.8', reviews: 175, 
+                badge: 'PREMIUM SOUND', badgeClass: 'badge-purple',
+                features: ['Immersive Audio', 'CustomTune Tech', 'World-Class ANC'], 
+                originalPrice: 29999, stock: 'In Stock'
+            },
+            'p13': { 
+                icon: '🎙️', category: 'audio', rating: '5.0', reviews: 520, 
+                badge: 'BROADCAST', badgeClass: 'badge-gold',
+                features: ['Flat Frequency', 'Air Suspension', 'Bass Roll-off'], 
+                originalPrice: 42999, stock: 'In Stock'
+            },
+            'p14': { 
+                icon: '🖥️', category: 'display', rating: '4.9', reviews: 88, 
+                badge: 'FLAGSHIP', badgeClass: 'badge-blue',
+                features: ['360Hz Fast IPS', '0.03ms GTG', 'NVIDIA G-SYNC'], 
+                originalPrice: 74999, stock: 'In Stock'
+            },
+            'p15': { 
+                icon: '🎒', category: 'power', rating: '4.9', reviews: 340, 
+                badge: 'WEATHERPROOF', badgeClass: 'badge-green',
+                features: ['MagLatch Hardware', 'FlexFold Dividers', '100% Recycled'], 
+                originalPrice: 26999, stock: 'In Stock'
+            },
+            'p16': { 
+                icon: '💺', category: 'power', rating: '5.0', reviews: 780, 
+                badge: 'ULTIMATE ERGO', badgeClass: 'badge-gold',
+                features: ['Pellicle Mesh', 'PostureFit SL', 'Harmonic 2 Tilt'], 
+                originalPrice: 155000, stock: 'In Stock'
+            }
         };
 
         let allProducts = [];
@@ -1309,6 +1679,7 @@
         // Terminal Log Logger
         const logTerminal = (msg, color = 'var(--text)') => {
             const term = document.getElementById('terminal');
+            if (!term) return;
             const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             const entry = document.createElement('div');
             entry.className = 'terminal-entry';
@@ -1326,7 +1697,7 @@
             setTimeout(() => toast.classList.remove('show'), 2500);
         };
 
-        // Fetch and load products from search-service
+        // Fetch products from search-service
         const fetchProducts = async (query = '') => {
             try {
                 const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
@@ -1334,7 +1705,7 @@
                 const products = await res.json();
                 allProducts = products;
                 renderProducts();
-                logTerminal(`Catalog refreshed: ${products.length} items loaded via search-service.`, 'var(--primary)');
+                logTerminal(`Catalog updated: ${products.length} hardware products loaded.`, 'var(--primary)');
             } catch (err) {
                 logTerminal(`Search API Error: ${err.message}`, 'var(--danger)');
                 document.getElementById('products-list').innerHTML = `
@@ -1345,7 +1716,7 @@
             }
         };
 
-        // Render product cards with dynamic filters
+        // Render Product Cards
         const renderProducts = () => {
             const container = document.getElementById('products-list');
             const filtered = allProducts.filter(p => {
@@ -1357,40 +1728,58 @@
             if (filtered.length === 0) {
                 container.innerHTML = `
                     <div style="grid-column: 1/-1; text-align: center; padding: 4rem; color: var(--text-dim);">
-                        No products match the selected criteria.
+                        No gear matches the selected category filter.
                     </div>
                 `;
                 return;
             }
 
             container.innerHTML = filtered.map(p => {
-                const meta = productMetadata[p.id] || { icon: '📦', category: 'Gear', rating: '4.8', reviews: 50, tag: 'In Stock' };
+                const meta = productMetadata[p.id] || { 
+                    icon: '📦', category: 'Gear', rating: '4.8', reviews: 100, 
+                    badge: 'IN STOCK', badgeClass: 'badge-blue',
+                    features: ['Enterprise Spec', 'Zero Latency'],
+                    originalPrice: Math.round(p.price * 1.2), stock: 'In Stock'
+                };
                 const inCart = cart[p.id] ? cart[p.id].quantity : 0;
+                const savings = meta.originalPrice > p.price ? Math.round(((meta.originalPrice - p.price) / meta.originalPrice) * 100) : 15;
 
                 return `
                     <div class="product-card">
                         <div>
                             <div class="card-top">
                                 <div class="product-icon-wrap">${meta.icon}</div>
-                                <span class="badge-stock">${meta.tag}</span>
+                                <div class="card-badges">
+                                    <span class="badge-highlight ${meta.badgeClass}">${meta.badge}</span>
+                                    <span class="badge-stock"><span class="badge-stock-dot"></span> ${meta.stock}</span>
+                                </div>
                             </div>
                             <div class="product-meta">
                                 <div class="product-category">${meta.category}</div>
                                 <div class="product-name">${p.name}</div>
-                                <div class="product-desc">Enterprise workstation grade hardware with full telemetry instrumentation.</div>
+                                
+                                <div class="product-features">
+                                    ${meta.features.map(f => `<span class="feature-tag">${f}</span>`).join('')}
+                                </div>
+
                                 <div class="product-rating">
-                                    ★ ${meta.rating} <span>(${meta.reviews} reviews)</span>
+                                    ★ ${meta.rating} <span>(${meta.reviews} verified reviews)</span>
                                 </div>
                             </div>
                         </div>
 
                         <div class="card-bottom">
-                            <div class="price-row">
-                                <div class="product-price">₹${p.price.toLocaleString('en-IN')}<small>/unit</small></div>
+                            <div class="price-container">
+                                <div class="price-main">
+                                    <div class="product-price">₹${p.price.toLocaleString('en-IN')}</div>
+                                    <div class="original-price">₹${meta.originalPrice.toLocaleString('en-IN')}</div>
+                                </div>
+                                <div class="save-pill">-${savings}% OFF</div>
                             </div>
+
                             <div class="btn-group">
-                                <button class="btn-cart" onclick="addToCart('${p.id}')">
-                                    <span>${inCart > 0 ? `+ Add (${inCart})` : '🛒 Add to Cart'}</span>
+                                <button class="btn-cart ${inCart > 0 ? 'in-cart' : ''}" onclick="addToCart('${p.id}')">
+                                    <span>${inCart > 0 ? `✓ In Cart (${inCart})` : '🛒 Add to Cart'}</span>
                                 </button>
                                 <button class="btn-buy-now" onclick="quickBuy('${p.id}')">
                                     <span>⚡ Buy Now</span>
@@ -1433,7 +1822,7 @@
             updateCartUI();
             renderProducts();
             showToast(`Added ${product.name} to cart!`, '🛒');
-            logTerminal(`Cart updated: +1 ${product.name}`, 'var(--success)');
+            logTerminal(`Cart: +1 ${product.name} (Qty: ${cart[productId].quantity})`, 'var(--success)');
         };
 
         const updateCartQty = (productId, delta) => {
@@ -1444,6 +1833,15 @@
             }
             updateCartUI();
             renderProducts();
+        };
+
+        const removeFromCart = (productId) => {
+            if (cart[productId]) {
+                delete cart[productId];
+                updateCartUI();
+                renderProducts();
+                showToast(`Removed item from cart`, '🗑️');
+            }
         };
 
         const updateCartUI = () => {
@@ -1457,8 +1855,8 @@
                 container.innerHTML = `
                     <div class="empty-cart-state">
                         <div class="empty-icon">🛒</div>
-                        <div style="font-weight: 700; color: var(--text-muted); margin-bottom: 0.3rem;">Your cart is empty</div>
-                        <div style="font-size: 0.8rem;">Browse the catalog and add gear to test checkout sagas!</div>
+                        <div style="font-weight: 700; color: var(--text); margin-bottom: 0.35rem;">Your cart is empty</div>
+                        <div style="font-size: 0.82rem; color: var(--text-dim);">Add gear from the catalog to test multi-item sagas!</div>
                     </div>
                 `;
                 document.getElementById('cart-subtotal').innerText = '₹0';
@@ -1481,10 +1879,13 @@
                             <div class="cart-item-title">${item.product.name}</div>
                             <div class="cart-item-price">₹${itemTotal.toLocaleString('en-IN')}</div>
                         </div>
-                        <div class="cart-item-stepper">
-                            <button class="step-btn" onclick="updateCartQty('${item.product.id}', -1)">−</button>
-                            <span class="step-qty">${item.quantity}</span>
-                            <button class="step-btn" onclick="updateCartQty('${item.product.id}', 1)">+</button>
+                        <div class="cart-item-controls">
+                            <div class="cart-item-stepper">
+                                <button class="step-btn" onclick="updateCartQty('${item.product.id}', -1)">−</button>
+                                <span class="step-qty">${item.quantity}</span>
+                                <button class="step-btn" onclick="updateCartQty('${item.product.id}', 1)">+</button>
+                            </div>
+                            <button class="btn-remove-item" onclick="removeFromCart('${item.product.id}')" title="Remove item">🗑️</button>
                         </div>
                     </div>
                 `;
@@ -1506,13 +1907,13 @@
             overlay.classList.toggle('open');
         };
 
-        // Quick Buy: Adds single item and opens cart for instant checkout
+        // Quick Buy: Adds item and opens cart immediately
         const quickBuy = (productId) => {
             addToCart(productId);
             toggleCart();
         };
 
-        // Multi-Item Checkout Function
+        // Multi-Item Checkout Orchestration
         const checkoutCart = async () => {
             const items = Object.values(cart).map(i => ({
                 productId: i.product.id,
@@ -1583,7 +1984,7 @@
                     toggleCart();
                     openModal();
 
-                    // Empty cart
+                    // Clear cart
                     cart = {};
                     updateCartUI();
                     renderProducts();
