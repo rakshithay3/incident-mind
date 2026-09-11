@@ -246,7 +246,7 @@
 
         .search-bar {
             flex: 1;
-            max-width: 440px;
+            max-width: 380px;
             position: relative;
         }
 
@@ -280,32 +280,24 @@
         .header-actions {
             display: flex;
             align-items: center;
-            gap: 0.65rem;
+            gap: 0.55rem;
         }
 
         /* Theme Palette Picker (6 Themes) */
         .theme-picker {
             display: flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.35rem;
             background: var(--surface);
-            padding: 0.35rem 0.65rem;
+            padding: 0.35rem 0.6rem;
             border-radius: 9999px;
             border: 1px solid var(--border);
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
 
-        .theme-picker span {
-            font-size: 0.72rem;
-            font-weight: 700;
-            color: var(--text-dim);
-            margin-right: 0.2rem;
-            text-transform: uppercase;
-        }
-
         .palette-dot {
-            width: 19px;
-            height: 19px;
+            width: 18px;
+            height: 18px;
             border-radius: 50%;
             cursor: pointer;
             border: 2px solid transparent;
@@ -333,18 +325,19 @@
         }
 
         .nav-btn {
-            padding: 0.6rem 0.95rem;
+            padding: 0.58rem 0.85rem;
             border-radius: 10px;
             border: 1px solid var(--border);
             background: var(--surface);
             color: var(--text-muted);
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             font-weight: 600;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
             gap: 0.4rem;
             cursor: pointer;
+            position: relative;
         }
 
         .nav-btn:hover {
@@ -370,6 +363,87 @@
             border-radius: 9999px;
             margin-left: 0.3rem;
             box-shadow: 0 0 10px rgba(239, 68, 68, 0.7);
+        }
+
+        .orders-badge {
+            background: var(--primary);
+            color: white;
+            font-size: 0.72rem;
+            font-weight: 800;
+            padding: 0.12rem 0.45rem;
+            border-radius: 9999px;
+            margin-left: 0.25rem;
+            box-shadow: 0 0 8px var(--primary-glow);
+        }
+
+        /* User Account Dropdown */
+        .user-account-menu {
+            position: relative;
+            display: inline-block;
+        }
+
+        .user-dropdown {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            width: 250px;
+            background: var(--surface);
+            border: 1px solid var(--border-glow);
+            border-radius: 16px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+            padding: 1rem;
+            z-index: 150;
+            display: none;
+            flex-direction: column;
+            gap: 0.5rem;
+            backdrop-filter: blur(14px);
+        }
+
+        .user-dropdown.open {
+            display: flex;
+        }
+
+        .user-dropdown-header {
+            padding-bottom: 0.6rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .user-role-pill {
+            display: inline-block;
+            font-size: 0.65rem;
+            font-weight: 800;
+            padding: 0.15rem 0.5rem;
+            border-radius: 9999px;
+            margin-top: 0.35rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .role-admin { background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
+        .role-member { background: rgba(99, 102, 241, 0.15); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.3); }
+        .role-guest { background: rgba(245, 158, 11, 0.15); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.3); }
+
+        .dropdown-item {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 0.5rem 0.65rem;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+
+        .dropdown-item:hover {
+            background: var(--surface-hover);
+            color: var(--text);
+        }
+
+        .dropdown-item.danger:hover {
+            color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
         }
 
         /* Hero Banner */
@@ -619,7 +693,7 @@
         .badge-green {
             background: linear-gradient(135deg, #10b981, #059669);
             color: #ffffff;
-            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+            box-shadow: 0 2px 8px rgba(168, 85, 247, 0.4);
         }
 
         .badge-stock {
@@ -1181,7 +1255,83 @@
             opacity: 0.5;
         }
 
-        /* Order Success Modal */
+        /* Slide-Out Orders Drawer */
+        .orders-drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            max-width: 480px;
+            background: var(--surface);
+            border-left: 1px solid var(--border);
+            box-shadow: -12px 0 44px rgba(0, 0, 0, 0.6);
+            z-index: 102;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .orders-drawer.open {
+            transform: translateX(0);
+        }
+
+        .order-history-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .order-history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .order-id-tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 800;
+            font-size: 0.9rem;
+            color: var(--text);
+        }
+
+        .order-status-badge {
+            font-size: 0.68rem;
+            font-weight: 800;
+            padding: 0.2rem 0.55rem;
+            border-radius: 9999px;
+            background: rgba(16, 185, 129, 0.12);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+
+        .order-items-summary {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            padding: 0.5rem 0;
+            border-top: 1px dashed var(--border);
+            border-bottom: 1px dashed var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .order-footer-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+        }
+
+        /* Order Success Modal & Auth Modal */
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -1206,11 +1356,77 @@
             background: var(--surface);
             border: 1px solid var(--border-glow);
             border-radius: 24px;
-            padding: 2.4rem;
-            max-width: 490px;
+            padding: 2.2rem;
+            max-width: 480px;
             width: 100%;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 40px var(--primary-glow);
-            text-align: center;
+            position: relative;
+        }
+
+        .modal-close-icon {
+            position: absolute;
+            top: 1.2rem;
+            right: 1.2rem;
+            background: var(--surface-hover);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+
+        /* Auth Tabs in Modal */
+        .auth-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1.2rem;
+            gap: 0.5rem;
+        }
+
+        .auth-tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.6rem 0.8rem;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: color 0.2s, border-color 0.2s;
+        }
+
+        .auth-tab-btn.active {
+            color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .quick-logins {
+            display: flex;
+            gap: 0.45rem;
+            margin: 0.9rem 0;
+            flex-wrap: wrap;
+        }
+
+        .quick-btn {
+            padding: 0.35rem 0.65rem;
+            border-radius: 8px;
+            font-size: 0.74rem;
+            font-weight: 700;
+            border: 1px dashed var(--border-glow);
+            background: var(--surface-hover);
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .quick-btn:hover {
+            background: var(--primary);
+            color: #fff;
+            border-color: transparent;
         }
 
         .modal-success-icon {
@@ -1233,12 +1449,14 @@
             font-weight: 800;
             margin-bottom: 0.4rem;
             color: var(--text);
+            text-align: center;
         }
 
         .modal-sub {
             font-size: 0.85rem;
             color: var(--text-muted);
             margin-bottom: 1.5rem;
+            text-align: center;
         }
 
         .modal-details {
@@ -1347,12 +1565,56 @@
                 <div class="palette-dot" style="background: linear-gradient(135deg, #faf6ef, #d97706);" onclick="setTheme('theme-champagne', this)" title="Warm Luxury Champagne (Rich Light)"></div>
             </div>
 
-            <a href="/dashboard.html" target="_blank" class="nav-btn">
-                <span>📊 RCA Dashboard</span>
+            <!-- RCA Dashboard Link -->
+            <a href="/dashboard.html" target="_blank" class="nav-btn" title="Open Interactive Visual RCA Dashboard">
+                <span>📊 RCA</span>
             </a>
-            <a href="http://localhost:16686" target="_blank" class="nav-btn">
+
+            <!-- Jaeger Trace Link -->
+            <a href="http://localhost:16686" target="_blank" class="nav-btn" title="Inspect Distributed Trace Waterfalls">
                 <span>🌐 Jaeger</span>
             </a>
+
+            <!-- My Placed Orders Button -->
+            <button class="nav-btn" onclick="openOrdersDrawer()" title="View Placed Orders History">
+                <span>📦 Orders</span>
+                <span class="orders-badge" id="orders-counter">0</span>
+            </button>
+
+            <!-- User Account / Login Button & Dropdown -->
+            <div class="user-account-menu" id="user-menu-wrap">
+                <button class="nav-btn" id="btn-auth-trigger" onclick="toggleUserDropdown()">
+                    <span id="user-avatar-icon">👤</span>
+                    <span id="user-name-label">Sign In / Guest</span>
+                    <span style="font-size: 0.65rem; opacity: 0.7;">▾</span>
+                </button>
+                <div class="user-dropdown" id="user-dropdown">
+                    <div class="user-dropdown-header">
+                        <div id="dropdown-user-name" style="font-weight: 800; font-size: 0.88rem;">Guest Shopper</div>
+                        <div id="dropdown-user-email" style="font-size: 0.72rem; color: var(--text-dim);">guest@shopmind.io</div>
+                        <span class="user-role-pill role-guest" id="dropdown-user-role">GUEST</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.2rem; margin-top: 0.3rem;">
+                        <div class="dropdown-item" onclick="openOrdersDrawer(); toggleUserDropdown(false);">
+                            <span>📦 View Placed Orders</span>
+                        </div>
+                        <div class="dropdown-item" onclick="openAuthModal('signin'); toggleUserDropdown(false);">
+                            <span>🔑 Sign In / Switch Account</span>
+                        </div>
+                        <div class="dropdown-item" onclick="openAuthModal('register'); toggleUserDropdown(false);">
+                            <span>✨ Create New Account</span>
+                        </div>
+                        <div class="dropdown-item" onclick="startGuestSession(); toggleUserDropdown(false);">
+                            <span>⚡ New Instant Guest Session</span>
+                        </div>
+                        <div class="dropdown-item danger" onclick="logoutUser(); toggleUserDropdown(false);">
+                            <span>🚪 Sign Out</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cart Drawer Button -->
             <button class="nav-btn primary" onclick="toggleCart()">
                 <span>🛒 Cart</span>
                 <span class="cart-badge" id="cart-counter">0</span>
@@ -1366,7 +1628,7 @@
             <div class="hero-text">
                 <div class="hero-eyebrow">✨ Next-Gen Microservice Storefront</div>
                 <h2>Curated High-Performance Workstation Hardware</h2>
-                <p>Enterprise gear powered by our live 12-microservice distributed cluster. Add multiple items to cart, test distributed sagas, inject chaos faults, and inspect live trace spans in Jaeger.</p>
+                <p>Enterprise gear powered by our live 12-microservice distributed cluster. Sign in as Admin or Guest, add items to cart, test multi-item checkout sagas, and view your orders in the backend order history.</p>
             </div>
             <div class="hero-stats">
                 <div class="stat-box">
@@ -1505,6 +1767,92 @@
         </div>
     </div>
 
+    <!-- Slide-Out Orders History Drawer -->
+    <div class="cart-overlay" id="orders-overlay" onclick="closeOrdersDrawer()"></div>
+    <div class="orders-drawer" id="orders-drawer">
+        <div class="cart-header">
+            <h3><span>📦 Placed Orders History</span></h3>
+            <button class="close-btn" onclick="closeOrdersDrawer()">✕</button>
+        </div>
+
+        <div style="padding: 0.75rem 1.6rem; background: var(--surface-hover); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.78rem; color: var(--text-dim);" id="orders-drawer-user-label">Orders for: Guest Shopper</span>
+            <button onclick="fetchUserOrders()" style="background: none; border: none; color: var(--primary); font-size: 0.75rem; font-weight: 700; cursor: pointer;">🔄 Refresh</button>
+        </div>
+
+        <div class="cart-items-list" id="orders-list-container">
+            <!-- Dynamic Placed Orders -->
+        </div>
+    </div>
+
+    <!-- User Authentication Modal (Sign In / Register / Guest) -->
+    <div class="modal-overlay" id="auth-modal">
+        <div class="modal-card">
+            <button class="modal-close-icon" onclick="closeAuthModal()">✕</button>
+            <h3 class="modal-title">ShopMind Account</h3>
+            <p class="modal-sub">Sign in, register, or continue with an instant guest session.</p>
+
+            <div class="auth-tabs">
+                <button class="auth-tab-btn active" id="tab-btn-signin" onclick="switchAuthTab('signin')">🔑 Sign In</button>
+                <button class="auth-tab-btn" id="tab-btn-register" onclick="switchAuthTab('register')">✨ Register</button>
+                <button class="auth-tab-btn" id="tab-btn-guest" onclick="switchAuthTab('guest')">⚡ Guest Mode</button>
+            </div>
+
+            <!-- Sign In Tab -->
+            <div id="auth-tab-signin-content">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="login-username" placeholder="e.g. admin or archie">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="login-password" placeholder="••••••••">
+                </div>
+
+                <div style="font-size: 0.72rem; color: var(--text-dim); margin-bottom: 0.35rem;">1-Click Quick Demo Sign In:</div>
+                <div class="quick-logins">
+                    <button type="button" class="quick-btn" onclick="quickLogin('admin', 'admin')">⚡ Admin (admin)</button>
+                    <button type="button" class="quick-btn" onclick="quickLogin('archie', 'password123')">⚡ Archie (archie)</button>
+                    <button type="button" class="quick-btn" onclick="quickLogin('demo', 'demo')">⚡ Demo Shopper</button>
+                </div>
+
+                <button class="modal-btn" onclick="submitLogin()" style="margin-top: 0.6rem;">Sign In to Account</button>
+            </div>
+
+            <!-- Register Tab -->
+            <div id="auth-tab-register-content" style="display: none;">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="reg-name" placeholder="e.g. John Doe">
+                </div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="reg-email" placeholder="john@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="reg-username" placeholder="johndoe">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="reg-password" placeholder="••••••••">
+                </div>
+                <button class="modal-btn" onclick="submitRegister()" style="margin-top: 0.6rem;">Create New Account</button>
+            </div>
+
+            <!-- Guest Mode Tab -->
+            <div id="auth-tab-guest-content" style="display: none;">
+                <div style="background: var(--surface-hover); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; margin-bottom: 1.2rem; text-align: left;">
+                    <div style="font-weight: 700; color: var(--text); margin-bottom: 0.4rem; font-size: 0.9rem;">⚡ Shop without creating an account</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.5;">
+                        We will generate an instant guest token. You can add multiple items to your cart, test checkout sagas, and track your placed orders without setting a password.
+                    </div>
+                </div>
+                <button class="modal-btn" onclick="startGuestSession()">⚡ Continue as Instant Guest</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Order Confirmation Modal -->
     <div class="modal-overlay" id="order-modal">
         <div class="modal-card">
@@ -1516,6 +1864,10 @@
                 <div class="modal-detail-row">
                     <span class="modal-detail-label">Order Identifier:</span>
                     <span class="modal-detail-val" id="modal-order-id">SM-ORD-94821</span>
+                </div>
+                <div class="modal-detail-row">
+                    <span class="modal-detail-label">Purchased By:</span>
+                    <span class="modal-detail-val" id="modal-customer-name">Archie Jain</span>
                 </div>
                 <div class="modal-detail-row">
                     <span class="modal-detail-label">Payment Reference:</span>
@@ -1535,8 +1887,8 @@
                 </div>
             </div>
 
-            <button class="modal-btn" onclick="closeModal()">Continue Shopping</button>
-            <div style="margin-top: 0.9rem;">
+            <button class="modal-btn" onclick="closeModal(); openOrdersDrawer();">View in My Orders ➔</button>
+            <div style="margin-top: 0.9rem; text-align: center;">
                 <a href="http://localhost:16686" target="_blank" style="font-size: 0.78rem; color: var(--primary); text-decoration: none; font-weight: 600;">
                     Inspect trace waterfall in Jaeger ↗
                 </a>
@@ -1571,6 +1923,257 @@
                 }
             });
         });
+
+        // Current User State & Authentication
+        let currentUser = null;
+        let userOrders = [];
+
+        // Initialize User on load
+        const initUserSession = async () => {
+            const savedUser = localStorage.getItem('shopmind_user');
+            if (savedUser) {
+                try {
+                    currentUser = JSON.parse(savedUser);
+                    updateUserUI();
+                    fetchUserOrders();
+                    return;
+                } catch(e) {}
+            }
+            // Auto-provision initial guest session if none exists
+            await startGuestSession(false);
+        };
+
+        const updateUserUI = () => {
+            if (!currentUser) return;
+            const label = document.getElementById('user-name-label');
+            const dropName = document.getElementById('dropdown-user-name');
+            const dropEmail = document.getElementById('dropdown-user-email');
+            const dropRole = document.getElementById('dropdown-user-role');
+            const drawerUser = document.getElementById('orders-drawer-user-label');
+
+            const isGuest = currentUser.role === 'guest';
+            label.innerText = isGuest ? `Guest (${currentUser.username})` : currentUser.name;
+            dropName.innerText = currentUser.name;
+            dropEmail.innerText = currentUser.email;
+
+            dropRole.innerText = (currentUser.role || 'MEMBER').toUpperCase();
+            dropRole.className = 'user-role-pill ' + (isGuest ? 'role-guest' : (currentUser.role === 'admin' ? 'role-admin' : 'role-member'));
+            drawerUser.innerText = `Orders for: ${currentUser.name}`;
+        };
+
+        const toggleUserDropdown = (forceState) => {
+            const dropdown = document.getElementById('user-dropdown');
+            if (typeof forceState === 'boolean') {
+                if (forceState) dropdown.classList.add('open');
+                else dropdown.classList.remove('open');
+            } else {
+                dropdown.classList.toggle('open');
+            }
+        };
+
+        // Close dropdown when clicking outside
+        window.addEventListener('click', (e) => {
+            const wrap = document.getElementById('user-menu-wrap');
+            if (wrap && !wrap.contains(e.target)) {
+                toggleUserDropdown(false);
+            }
+        });
+
+        // Auth Modal Controls
+        const openAuthModal = (tab = 'signin') => {
+            switchAuthTab(tab);
+            document.getElementById('auth-modal').classList.add('open');
+        };
+
+        const closeAuthModal = () => {
+            document.getElementById('auth-modal').classList.remove('open');
+        };
+
+        const switchAuthTab = (tab) => {
+            const tabs = ['signin', 'register', 'guest'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`tab-btn-${t}`);
+                const content = document.getElementById(`auth-tab-${t}-content`);
+                if (t === tab) {
+                    btn.classList.add('active');
+                    content.style.display = 'block';
+                } else {
+                    btn.classList.remove('active');
+                    content.style.display = 'none';
+                }
+            });
+        };
+
+        // Submit Sign In
+        const submitLogin = async () => {
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value.trim();
+            if (!username || !password) {
+                showToast('Please enter both username and password', '⚠️');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Login failed');
+
+                currentUser = data.user;
+                localStorage.setItem('shopmind_user', JSON.stringify(currentUser));
+                updateUserUI();
+                closeAuthModal();
+                showToast(`Welcome back, ${currentUser.name}!`, '👋');
+                logTerminal(`[AUTH] Logged in as ${currentUser.username} (${currentUser.role})`, 'var(--success)');
+                fetchUserOrders();
+            } catch (err) {
+                showToast(err.message, '⚠️');
+                logTerminal(`[AUTH ERROR] ${err.message}`, 'var(--danger)');
+            }
+        };
+
+        // Quick demo login
+        const quickLogin = (u, p) => {
+            document.getElementById('login-username').value = u;
+            document.getElementById('login-password').value = p;
+            submitLogin();
+        };
+
+        // Submit Registration
+        const submitRegister = async () => {
+            const name = document.getElementById('reg-name').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const username = document.getElementById('reg-username').value.trim();
+            const password = document.getElementById('reg-password').value.trim();
+
+            if (!username || !password) {
+                showToast('Username and password are required', '⚠️');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, username, password })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Registration failed');
+
+                currentUser = data.user;
+                localStorage.setItem('shopmind_user', JSON.stringify(currentUser));
+                updateUserUI();
+                closeAuthModal();
+                showToast(`Account created! Welcome, ${currentUser.name}!`, '🎉');
+                logTerminal(`[AUTH] New user registered: ${currentUser.username}`, 'var(--success)');
+                fetchUserOrders();
+            } catch (err) {
+                showToast(err.message, '⚠️');
+                logTerminal(`[REGISTER ERROR] ${err.message}`, 'var(--danger)');
+            }
+        };
+
+        // Instant Guest Session
+        const startGuestSession = async (notify = true) => {
+            try {
+                const res = await fetch('/api/auth/guest', { method: 'POST' });
+                const data = await res.json();
+                currentUser = data.user;
+                localStorage.setItem('shopmind_user', JSON.stringify(currentUser));
+                updateUserUI();
+                closeAuthModal();
+                if (notify) {
+                    showToast(`Active as ${currentUser.name}`, '⚡');
+                    logTerminal(`[AUTH] Guest session initiated: ${currentUser.id}`, 'var(--primary)');
+                }
+                fetchUserOrders();
+            } catch(err) {
+                logTerminal(`[GUEST AUTH ERROR] ${err.message}`, 'var(--danger)');
+            }
+        };
+
+        // Sign Out
+        const logoutUser = () => {
+            localStorage.removeItem('shopmind_user');
+            startGuestSession(true);
+            showToast('Signed out of account', '🚪');
+        };
+
+        // Fetch user orders from backend order-service
+        const fetchUserOrders = async () => {
+            if (!currentUser) return;
+            try {
+                const res = await fetch(`/api/order/user/${encodeURIComponent(currentUser.id)}`);
+                if (!res.ok) throw new Error('Failed to load order history');
+                userOrders = await res.json();
+                document.getElementById('orders-counter').innerText = userOrders.length;
+                renderOrdersDrawer();
+            } catch (err) {
+                console.error(err);
+            }
+        };
+
+        // Render Orders Drawer
+        const renderOrdersDrawer = () => {
+            const container = document.getElementById('orders-list-container');
+            if (userOrders.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-cart-state">
+                        <div class="empty-icon">📦</div>
+                        <div style="font-weight: 700; color: var(--text); margin-bottom: 0.35rem;">No orders placed yet</div>
+                        <div style="font-size: 0.82rem; color: var(--text-dim);">Add gear from catalog and checkout to record your first order!</div>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = userOrders.map(ord => {
+                const itemsCount = (ord.items || []).reduce((sum, i) => sum + (i.quantity || 1), 0);
+                const itemsList = (ord.items || []).map(i => `• ${i.name || i.productId} × ${i.quantity || 1}`).join('<br>');
+                const orderDate = new Date(ord.createdAt || Date.now()).toLocaleDateString('en-IN', {
+                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                });
+
+                return `
+                    <div class="order-history-card">
+                        <div class="order-history-header">
+                            <div>
+                                <span class="order-id-tag">${ord.orderId}</span>
+                                <div style="font-size: 0.72rem; color: var(--text-dim); margin-top: 0.15rem;">${orderDate}</div>
+                            </div>
+                            <span class="order-status-badge">● ${ord.status || 'Confirmed'}</span>
+                        </div>
+                        <div class="order-items-summary">
+                            <div style="font-weight: 700; margin-bottom: 0.2rem; color: var(--text);">${itemsCount} Item(s):</div>
+                            ${itemsList}
+                        </div>
+                        <div class="order-footer-row">
+                            <div>
+                                <span style="font-size: 0.72rem; color: var(--text-dim);">Total:</span>
+                                <span style="font-family: 'JetBrains Mono', monospace; font-weight: 800; color: var(--primary); font-size: 0.95rem;">₹${(ord.amount || 0).toLocaleString('en-IN')}</span>
+                            </div>
+                            <a href="http://localhost:16686" target="_blank" style="font-size: 0.75rem; color: var(--primary); text-decoration: none; font-weight: 700;">
+                                View Trace ↗
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        const openOrdersDrawer = () => {
+            fetchUserOrders();
+            document.getElementById('orders-drawer').classList.add('open');
+            document.getElementById('orders-overlay').classList.add('open');
+        };
+
+        const closeOrdersDrawer = () => {
+            document.getElementById('orders-drawer').classList.remove('open');
+            document.getElementById('orders-overlay').classList.remove('open');
+        };
 
         // Rich Product Metadata (Icons, Badges, Features, Original Prices)
         const productMetadata = {
@@ -1913,7 +2516,7 @@
             toggleCart();
         };
 
-        // Multi-Item Checkout Orchestration
+        // Multi-Item Checkout Orchestration with Active User Association
         const checkoutCart = async () => {
             const items = Object.values(cart).map(i => ({
                 productId: i.product.id,
@@ -1932,7 +2535,11 @@
             const subtotal = items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
             const grandTotal = Math.round(subtotal * 1.18);
 
-            logTerminal(`[CHECKOUT] Dispatching order for ${totalItemsCount} items to /api/order/create...`, 'var(--warning)');
+            const activeUserId = currentUser ? currentUser.id : 'guest_' + Math.floor(1000 + Math.random() * 9000);
+            const activeUserName = currentUser ? currentUser.name : 'Guest Shopper';
+            const activeUserType = currentUser ? currentUser.role : 'guest';
+
+            logTerminal(`[CHECKOUT] Dispatching order for user ${activeUserName} (${activeUserId}) to /api/order/create...`, 'var(--warning)');
 
             const t0 = performance.now();
             try {
@@ -1941,8 +2548,10 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        userId: 1,
-                        items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
+                        userId: activeUserId,
+                        userName: activeUserName,
+                        userType: activeUserType,
+                        items: items.map(i => ({ productId: i.productId, name: i.name, quantity: i.quantity, price: i.price })),
                         amount: grandTotal
                     })
                 });
@@ -1975,19 +2584,23 @@
 
                     // Populate success modal
                     document.getElementById('modal-order-id').innerText = orderData.orderId || 'SM-ORD-98412';
+                    document.getElementById('modal-customer-name').innerText = activeUserName;
                     document.getElementById('modal-payment-ref').innerText = payData.payment_id || 'pay_verified_ok';
                     document.getElementById('modal-item-count').innerText = `${totalItemsCount} items (${items.length} unique)`;
                     document.getElementById('modal-total-amount').innerText = `₹${grandTotal.toLocaleString('en-IN')}`;
                     document.getElementById('modal-latency').innerText = `${elapsedMs} ms`;
 
-                    // Close cart and open modal
+                    // Close cart and open success modal
                     toggleCart();
                     openModal();
 
-                    // Clear cart
+                    // Empty cart
                     cart = {};
                     updateCartUI();
                     renderProducts();
+
+                    // Refresh user orders from backend
+                    fetchUserOrders();
                 } else {
                     throw new Error(payData.error || 'Payment verification rejected');
                 }
@@ -2038,6 +2651,7 @@
 
         // Initialize on page load
         fetchProducts();
+        initUserSession();
     </script>
 </body>
 </html>

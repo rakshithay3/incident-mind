@@ -241,10 +241,40 @@ const server = http.createServer(async (req, res) => {
 });
 
 
+const orders = [
+  {
+    orderId: 'SM-ORD-83921',
+    userId: '1',
+    userName: 'Admin Administrator',
+    userType: 'member',
+    items: [
+      { productId: 'p1', name: 'Keychron K2 Mechanical Keyboard', quantity: 1, price: 7999 },
+      { productId: 'p2', name: 'Logitech MX Master 3S Mouse', quantity: 1, price: 10999 }
+    ],
+    amount: 22418,
+    paymentOrderId: 'pay_live_seeded_1',
+    status: 'Delivered',
+    createdAt: new Date(Date.now() - 86400000 * 3).toISOString()
+  },
+  {
+    orderId: 'SM-ORD-74120',
+    userId: '2',
+    userName: 'Archie Jain',
+    userType: 'member',
+    items: [
+      { productId: 'p3', name: 'Sony WH-1000XM5 Headphones', quantity: 1, price: 29999 }
+    ],
+    amount: 35399,
+    paymentOrderId: 'pay_live_seeded_2',
+    status: 'In Transit',
+    createdAt: new Date(Date.now() - 86400000).toISOString()
+  }
+];
+
 async function routeRequest(path, method, body, ctx, send, query) {
   if (path === '/api/order/create' && method === 'POST') {
-    const { userId, items } = body;
-    console.log('Creating order for user:', userId);
+    const { userId, userName, userType, items, amount } = body;
+    console.log('Creating order for user:', userId, 'items count:', (items || []).length);
 
     // Call inventory
     const invRes = await callService('http://inventory-service:3005/api/inventory/check-and-deduct', 'POST', { items }, ctx);
@@ -253,7 +283,7 @@ async function routeRequest(path, method, body, ctx, send, query) {
     }
 
     // Call payment
-    const paymentRes = await callService('http://payment-service:3004/api/payment/create-order', 'POST', { amount: 50000, currency: 'INR' }, ctx);
+    const paymentRes = await callService('http://payment-service:3004/api/payment/create-order', 'POST', { amount: amount || 50000, currency: 'INR' }, ctx);
     if (paymentRes.statusCode !== 200) {
       return send(paymentRes.statusCode, { error: 'Payment initialization failed', details: paymentRes.body });
     }
@@ -261,11 +291,46 @@ async function routeRequest(path, method, body, ctx, send, query) {
     // Call notification
     await callService('http://notification-service:3006/api/notification/send', 'POST', { userId, message: 'Order created' }, ctx);
 
+    const orderId = 'SM-ORD-' + Math.floor(10000 + Math.random() * 90000);
+    const newOrder = {
+      orderId,
+      userId: String(userId || 'guest_default'),
+      userName: userName || (String(userId).startsWith('guest_') ? 'Guest Shopper' : 'ShopMind Member'),
+      userType: userType || (String(userId).startsWith('guest_') ? 'guest' : 'member'),
+      items: items || [],
+      amount: amount || 0,
+      paymentOrderId: paymentRes.body.id,
+      status: 'Confirmed',
+      createdAt: new Date().toISOString()
+    };
+    orders.unshift(newOrder);
+
     send(200, {
-      orderId: 'SM-ORD-' + Math.floor(Math.random() * 100000),
-      status: 'Created',
-      paymentOrderId: paymentRes.body.id
+      orderId: newOrder.orderId,
+      status: newOrder.status,
+      paymentOrderId: newOrder.paymentOrderId,
+      order: newOrder
     });
+  } else if (method === 'GET') {
+    const userMatch = path.match(/^\/api\/order\/user\/([^/?]+)$/);
+    if (userMatch) {
+      const uid = String(userMatch[1]);
+      const userOrders = orders.filter(o => String(o.userId) === uid);
+      return send(200, userOrders);
+    }
+
+    const detailMatch = path.match(/^\/api\/order\/detail\/([^/?]+)$/);
+    if (detailMatch) {
+      const ord = orders.find(o => o.orderId === detailMatch[1]);
+      if (ord) return send(200, ord);
+      return send(404, { error: 'Order not found' });
+    }
+
+    if (path === '/api/order/list') {
+      return send(200, orders);
+    }
+
+    send(404, { error: 'Not Found' });
   } else {
     send(404, { error: 'Not Found' });
   }
@@ -275,3 +340,4 @@ async function routeRequest(path, method, body, ctx, send, query) {
 server.listen(PORT, () => {
   console.log(SERVICE_NAME + ' listening at http://localhost:' + PORT);
 });
+

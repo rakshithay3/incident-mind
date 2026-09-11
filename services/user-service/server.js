@@ -242,18 +242,35 @@ const server = http.createServer(async (req, res) => {
 
 
 const users = {
-  '1': { id: 1, name: 'Archie Jain', email: 'archie@example.com' },
-  '2': { id: 2, name: 'Test User', email: 'test@example.com' }
+  '1': { id: '1', name: 'Admin Administrator', username: 'admin', role: 'admin', email: 'admin@shopmind.io' },
+  '2': { id: '2', name: 'Archie Jain', username: 'archie', role: 'member', email: 'archie@example.com' },
+  '3': { id: '3', name: 'Demo Shopper', username: 'demo', role: 'member', email: 'demo@shopmind.io' }
 };
+
 async function routeRequest(path, method, body, ctx, send, query) {
-  const match = path.match(/^\/api\/user\/(\w+)$/);
+  const match = path.match(/^\/api\/user\/([^/?]+)$/);
   if (match && method === 'GET') {
-    const user = users[match[1]];
-    if (user) {
-      send(200, user);
-    } else {
-      send(404, { error: 'User not found' });
+    const uid = match[1];
+    if (users[uid]) {
+      return send(200, users[uid]);
     }
+    if (uid.startsWith('guest_')) {
+      const num = uid.replace('guest_', '');
+      return send(200, {
+        id: uid,
+        name: 'Guest Shopper #' + num,
+        username: 'Guest_' + num,
+        role: 'guest',
+        email: `guest${num}@shopmind.io`
+      });
+    }
+    return send(200, {
+      id: uid,
+      name: 'ShopMind Shopper #' + uid,
+      username: 'user_' + uid,
+      role: 'member',
+      email: `user${uid}@shopmind.io`
+    });
   } else {
     send(404, { error: 'Not found' });
   }
@@ -263,3 +280,4 @@ async function routeRequest(path, method, body, ctx, send, query) {
 server.listen(PORT, () => {
   console.log(SERVICE_NAME + ' listening at http://localhost:' + PORT);
 });
+

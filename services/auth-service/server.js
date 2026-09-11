@@ -241,25 +241,88 @@ const server = http.createServer(async (req, res) => {
 });
 
 
+const accounts = {
+  'admin': { id: '1', username: 'admin', password: 'admin', role: 'admin', name: 'Admin Administrator', email: 'admin@shopmind.io' },
+  'archie': { id: '2', username: 'archie', password: 'password123', role: 'member', name: 'Archie Jain', email: 'archie@example.com' },
+  'demo': { id: '3', username: 'demo', password: 'demo', role: 'member', name: 'Demo Shopper', email: 'demo@shopmind.io' }
+};
+
 async function routeRequest(path, method, body, ctx, send, query) {
+  // Login
   if (path === '/api/auth/login' && method === 'POST') {
-    if (body.username === 'admin' && body.password === 'admin') {
-      send(200, { token: 'mock-jwt-token-xyz', user: { username: body.username, id: 1, role: 'admin' } });
-    } else {
-      send(401, { error: 'Invalid credentials' });
+    const { username, password } = body || {};
+    const acc = accounts[username];
+    if (acc && acc.password === password) {
+      const token = 'jwt_' + crypto.randomBytes(16).toString('hex');
+      return send(200, {
+        token,
+        user: { id: acc.id, username: acc.username, role: acc.role, name: acc.name, email: acc.email }
+      });
     }
-  } else if (path === '/api/auth/verify' && method === 'POST') {
-    if (body.token === 'mock-jwt-token-xyz') {
-      send(200, { valid: true, user: { username: 'admin', id: 1, role: 'admin' } });
-    } else {
-      send(401, { valid: false, error: 'Invalid token' });
-    }
-  } else {
-    send(404, { error: 'Not found' });
+    return send(401, { error: 'Invalid username or password' });
   }
+
+  // Register New User
+  if (path === '/api/auth/register' && method === 'POST') {
+    const { username, password, name, email } = body || {};
+    if (!username || !password) {
+      return send(400, { error: 'Username and password are required' });
+    }
+    if (accounts[username]) {
+      return send(409, { error: 'Username already exists' });
+    }
+    const newId = String(Object.keys(accounts).length + 10);
+    const newAcc = {
+      id: newId,
+      username,
+      password,
+      role: 'member',
+      name: name || username,
+      email: email || `${username}@shopmind.io`
+    };
+    accounts[username] = newAcc;
+    const token = 'jwt_' + crypto.randomBytes(16).toString('hex');
+    return send(201, {
+      token,
+      user: { id: newAcc.id, username: newAcc.username, role: newAcc.role, name: newAcc.name, email: newAcc.email }
+    });
+  }
+
+  // Instant Guest Session
+  if (path === '/api/auth/guest' && method === 'POST') {
+    const guestNum = Math.floor(1000 + Math.random() * 9000);
+    const guestId = 'guest_' + guestNum;
+    const guestUser = {
+      id: guestId,
+      username: 'Guest_' + guestNum,
+      role: 'guest',
+      name: 'Guest Shopper #' + guestNum,
+      email: `guest${guestNum}@shopmind.io`
+    };
+    const token = 'guest_jwt_' + crypto.randomBytes(12).toString('hex');
+    return send(200, { token, user: guestUser });
+  }
+
+  // Token Verification
+  if (path === '/api/auth/verify' && method === 'POST') {
+    const { token } = body || {};
+    if (token) {
+      return send(200, { valid: true });
+    }
+    return send(401, { valid: false, error: 'Missing or invalid token' });
+  }
+
+  // Accounts directory
+  if (path === '/api/auth/users' && method === 'GET') {
+    const safeUsers = Object.values(accounts).map(a => ({ id: a.id, username: a.username, role: a.role, name: a.name, email: a.email }));
+    return send(200, safeUsers);
+  }
+
+  send(404, { error: 'Not found' });
 }
 
 
 server.listen(PORT, () => {
   console.log(SERVICE_NAME + ' listening at http://localhost:' + PORT);
 });
+
