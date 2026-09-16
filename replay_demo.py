@@ -45,6 +45,7 @@ from incidentmind_p1.contracts import IncidentGraph, ServiceNode
 from incidentmind_p1.dispatch import PPODispatcher
 from incidentmind_p1.gnn_scorer import GraphSAGEScorer
 from incidentmind_p1.training import load_checkpoint
+from priority.impact_weights import PriorityWeightedScorer
 
 CPU_RATIO_TO_PERCENT = 100.0
 MS_TO_SECONDS = 1.0 / 1000.0
@@ -240,6 +241,7 @@ def main() -> None:
     print("[3/5] Scoring with GraphSAGE + dispatching with PPO...")
     encoder, stats = load_checkpoint(args.graphsage_model)
     scorer = GraphSAGEScorer(encoder, stats)
+    scorer = PriorityWeightedScorer(scorer)
     ranked = sorted(scorer.score_graph(incident), key=lambda s: s.rank)
     print("  Ranking:")
     for s in ranked[:5]:
