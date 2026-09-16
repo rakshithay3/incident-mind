@@ -46,6 +46,7 @@ from incidentmind_p1.dispatch import PPODispatcher
 from incidentmind_p1.gnn_scorer import GraphSAGEScorer
 from incidentmind_p1.training import load_checkpoint
 from priority.impact_weights import PriorityWeightedScorer
+from multi_fault import detect_multi_fault
 
 CPU_RATIO_TO_PERCENT = 100.0
 MS_TO_SECONDS = 1.0 / 1000.0
@@ -248,6 +249,11 @@ def main() -> None:
         marker = " <-- true root cause" if s.service_id == telemetry["target_service"] else ""
         print(f"    #{s.rank} {s.service_id:<22} score={s.anomaly_score:.3f} status={s.status}{marker}")
 
+    multi_fault_nodes = detect_multi_fault(ranked)
+    print(f"  Multi-fault detection: {len(multi_fault_nodes)} node(s) above anomaly threshold")
+    for s in multi_fault_nodes:
+        print(f"    -> {s.service_id} (score={s.anomaly_score:.3f})")
+
     from stable_baselines3 import PPO
 
     policy = PPO.load(args.ppo_model)
@@ -300,6 +306,10 @@ def main() -> None:
         "nodes": [
             {"service_id": s.service_id, "anomaly_score": s.anomaly_score, "status": s.status, "rank": s.rank}
             for s in ranked
+        ],
+        "multi_fault_detected": [
+            {"service_id": s.service_id, "anomaly_score": s.anomaly_score, "rank": s.rank}
+            for s in multi_fault_nodes
         ],
         "ppo_dispatch": {
             "agent_type": decision.action.agent_type,
