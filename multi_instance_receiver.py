@@ -29,6 +29,7 @@ class TelemetryReceiverHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
+        print(f"[conn] from {self.client_address}")  # TEMP: cross-machine test tracing, remove after
         if self.path != "/telemetry":
             self._send_json(404, {"error": "not found"})
             return

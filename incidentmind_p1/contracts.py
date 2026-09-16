@@ -66,6 +66,7 @@ class NodeScore:
     embedding_dim: int
     status: str
     rank: int
+    instance_id: Optional[str] = None
 
     def to_json(self) -> Dict[str, Any]:
         return {
@@ -74,6 +75,7 @@ class NodeScore:
             "embedding_dim": int(self.embedding_dim),
             "status": self.status,
             "rank": int(self.rank),
+            "instance_id": self.instance_id,
         }
 
 
@@ -88,9 +90,14 @@ class DispatchAction:
 
     agent_type: AgentType
     target_service: str
+    instance_id: Optional[str] = None
 
-    def to_json(self) -> Dict[str, str]:
-        return {"agent_type": self.agent_type, "target_service": self.target_service}
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            "agent_type": self.agent_type,
+            "target_service": self.target_service,
+            "instance_id": self.instance_id,
+        }
 
 
 @dataclass(frozen=True)

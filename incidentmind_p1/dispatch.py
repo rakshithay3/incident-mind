@@ -12,7 +12,7 @@ to change shape.
 
 from __future__ import annotations
 
-from typing import Iterable, List, Optional, Sequence, Set
+from typing import Any, Iterable, List, Optional, Sequence, Set
 
 from .contracts import DispatchAction, DispatchDecision, NodeScore
 
@@ -22,15 +22,29 @@ MAX_SERVICES = 12
 ACTION_SPACE_SIZE = MAX_SERVICES * len(AGENT_TYPES)  # 36
 
 
-def greedy_baseline_c(scores: Iterable[NodeScore], agent_type: str = "log") -> DispatchDecision:
+def _node_key(score: NodeScore) -> Any:
+    """Identity used for visited-tracking. A plain service_id is ambiguous
+    once nodes from multiple instances are mixed into one ranked list (every
+    ShopMind instance runs the same service names), so a node tagged with
+    instance_id is keyed by (instance_id, service_id) instead. Single-instance
+    NodeScores (instance_id=None, the default) key by service_id alone,
+    matching every existing caller's plain-string visited sets unchanged."""
+    return (score.instance_id, score.service_id) if score.instance_id is not None else score.service_id
+
+
+def greedy_baseline_c(
+    scores: Iterable[NodeScore], agent_type: str = "log", visited: Optional[Set] = None
+) -> DispatchDecision:
     ranked = sorted(scores, key=lambda score: score.rank)
+    if visited:
+        ranked = [s for s in ranked if _node_key(s) not in visited]
     if not ranked:
         raise ValueError("cannot dispatch without node scores")
     top = ranked[0]
     confidence = max(0.0, min(1.0, top.anomaly_score / 2.0))
     return DispatchDecision(
         step=1,
-        action=DispatchAction(agent_type=agent_type, target_service=top.service_id),
+        action=DispatchAction(agent_type=agent_type, target_service=top.service_id, instance_id=top.instance_id),
         policy_confidence=confidence,
     )
 
@@ -52,8 +66,8 @@ def decode_action(action_index: int, ranked_scores: Sequence[NodeScore]) -> Disp
         raise ValueError(f"action_index out of range [0, {ACTION_SPACE_SIZE}): {action_index}")
     slot = action_index % MAX_SERVICES
     agent_idx = action_index // MAX_SERVICES
-    service_id = ranked_scores[slot % n].service_id
-    return DispatchAction(agent_type=AGENT_TYPES[agent_idx], target_service=service_id)
+    node = ranked_scores[slot % n]
+    return DispatchAction(agent_type=AGENT_TYPES[agent_idx], target_service=node.service_id, instance_id=node.instance_id)
 
 
 def build_observation(ranked_scores: Sequence[NodeScore], visited: Set[str]) -> List[float]:
@@ -69,7 +83,7 @@ def build_observation(ranked_scores: Sequence[NodeScore], visited: Set[str]) -> 
     visited_vec = [0.0] * MAX_SERVICES
     for slot, score in enumerate(ranked_scores[:MAX_SERVICES]):
         scores_vec[slot] = float(score.anomaly_score)
-        visited_vec[slot] = 1.0 if score.service_id in visited else 0.0
+        visited_vec[slot] = 1.0 if _node_key(score) in visited else 0.0
     return scores_vec + visited_vec
 
 
@@ -88,15 +102,15 @@ class PPODispatcher:
     def choose(
         self,
         scores: Iterable[NodeScore],
-        visited: Optional[Set[str]] = None,
+        visited: Optional[Set] = None,
         step: int = 1,
     ) -> DispatchDecision:
         ranked = sorted(scores, key=lambda score: score.rank)
         if not ranked:
             raise ValueError("cannot dispatch without node scores")
-        if self.policy is None:
-            return greedy_baseline_c(ranked)
         visited = visited or set()
+        if self.policy is None:
+            return greedy_baseline_c(ranked, visited=visited)
         observation = build_observation(ranked, visited)
         action_index, _ = self.policy.predict(observation, deterministic=True)
         action = decode_action(int(action_index), ranked)
