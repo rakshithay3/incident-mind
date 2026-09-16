@@ -164,6 +164,17 @@ class BaselineATest(unittest.TestCase):
         with self.assertRaises(ValueError):
             baseline_a(scores)
 
+    def test_pick_is_independent_of_caller_supplied_order(self):
+        # Regression test: baseline_a used to draw by index into whatever
+        # order the caller passed in (e.g. score-descending rank order),
+        # so the same seed could implicitly correlate with anomaly rank.
+        # Candidates are canonicalized internally now, so the same seed
+        # must pick the same node regardless of input order.
+        scores = _mixed_status_scores(["anomalous"] * 5)
+        forward = baseline_a(scores, seed=3)
+        reversed_order = baseline_a(list(reversed(scores)), seed=3)
+        self.assertEqual(forward.action.target_service, reversed_order.action.target_service)
+
 
 class BaselineBTest(unittest.TestCase):
     def test_dispatches_first_anomalous_in_arrival_order_not_rank(self):

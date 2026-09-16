@@ -71,6 +71,12 @@ def baseline_a(
         candidates = [s for s in candidates if _node_key(s) not in visited]
     if not candidates:
         raise ValueError("cannot dispatch without anomalous node scores")
+    # Canonicalize onto a content-derived order before drawing, so the pick
+    # depends only on WHICH services are anomalous, never on whatever order
+    # the caller happened to supply them in (e.g. score-descending rank
+    # order) -- otherwise the random draw's index would implicitly
+    # correlate with whatever ordering convention the caller used.
+    candidates.sort(key=_node_key)
     rng = random.Random(seed + len(visited or ()))
     pick = rng.choice(candidates)
     confidence = max(0.0, min(1.0, pick.anomaly_score / 2.0))

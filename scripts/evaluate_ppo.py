@@ -13,7 +13,13 @@ progressively less signal?
   Baseline A -- uniformly random among anomalous nodes (the floor: no
                 ranking, no threshold-arrival ordering, no learning).
   Baseline B -- threshold-only, arrival order (any signal beats none, but
-                still no ranking by anomaly_score).
+                still no ranking by anomaly_score). "Arrival order" here is
+                a per-incident seeded shuffle, NOT score_graph()'s raw
+                output (already score-sorted) or the incident's raw node
+                order (RCAEval's node listing is a fixed per-root-cause-
+                service slot, e.g. currencyservice is always index 10 of
+                11) -- either of those would leak the answer through
+                position instead of testing threshold-only dispatch.
   Baseline C -- always greedily pick the top-ranked node, deterministically.
                 Has no memory across steps, so if its first (and only)
                 guess is wrong it never recovers within the step budget.
@@ -32,6 +38,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import random
 import statistics as st
 from pathlib import Path
@@ -78,12 +85,11 @@ def run_episode_greedy(scorer: AnomalyScorer, incident, step_budget: int = STEP_
     return step_budget, False
 
 
-def run_episode_baseline_stepped(dispatch_fn, scorer: AnomalyScorer, incident, step_budget: int = STEP_BUDGET):
+def run_episode_baseline_stepped(dispatch_fn, ranked, incident, step_budget: int = STEP_BUDGET):
     """Shared step loop for Baseline A and Baseline B -- unlike Baseline C,
     both actually use the visited set to try a different node on each
     retry (random re-roll for A, next-in-arrival-order for B), so they get
     the same multi-step chance within the budget that PPO gets."""
-    ranked = sorted(scorer.score_graph(incident), key=lambda s: s.rank)
     visited: set = set()
     for step in range(1, step_budget + 1):
         decision = dispatch_fn(ranked, visited=visited)
@@ -95,13 +101,35 @@ def run_episode_baseline_stepped(dispatch_fn, scorer: AnomalyScorer, incident, s
 
 
 def run_episode_baseline_a(scorer: AnomalyScorer, incident, step_budget: int = STEP_BUDGET, seed: int = 0):
+    ranked = sorted(scorer.score_graph(incident), key=lambda s: s.rank)
     return run_episode_baseline_stepped(
-        lambda ranked, visited: baseline_a(ranked, visited=visited, seed=seed), scorer, incident, step_budget
+        lambda ranked, visited: baseline_a(ranked, visited=visited, seed=seed), ranked, incident, step_budget
     )
 
 
-def run_episode_baseline_b(scorer: AnomalyScorer, incident, step_budget: int = STEP_BUDGET):
-    return run_episode_baseline_stepped(baseline_b, scorer, incident, step_budget)
+def _stable_seed(seed: int, key: str) -> int:
+    """A random.seed() input that is portable across processes and Python
+    versions -- unlike the builtin hash(), which is randomized per-process
+    by PYTHONHASHSEED and would break reproducibility run to run."""
+    digest = hashlib.sha256(f"{seed}:{key}".encode()).digest()
+    return int.from_bytes(digest[:8], "big")
+
+
+def run_episode_baseline_b(scorer: AnomalyScorer, incident, step_budget: int = STEP_BUDGET, seed: int = 0):
+    """Baseline B needs a genuine 'arrival order' -- independent of BOTH
+    anomaly_score (score_graph() always returns nodes pre-sorted by score,
+    so the rank-sorted list every other baseline uses would make Baseline B
+    silently identical to Baseline C on its first pick) and the incident's
+    raw topology order (RCAEval's node listing is a FIXED per-service-
+    identity slot -- e.g. every currencyservice-root-cause incident has
+    currencyservice at index 10 of 11 across all 125 incidents -- so using
+    graph.nodes' raw order directly would just swap one leakage source for
+    another). Shuffling once per incident with a seed keyed to incident_id
+    keeps it reproducible across runs while decorrelating the order from
+    both confounds."""
+    scores = list(scorer.score_graph(incident))
+    random.Random(_stable_seed(seed, incident.incident_id)).shuffle(scores)
+    return run_episode_baseline_stepped(baseline_b, scores, incident, step_budget)
 
 
 def summarize(results, label: str):
@@ -155,7 +183,7 @@ def main() -> None:
 
     ppo_results = [run_episode_ppo(dispatcher, scorer, inc, args.step_budget) for inc in test_incidents]
     baseline_a_results = [run_episode_baseline_a(scorer, inc, args.step_budget, seed=args.seed) for inc in test_incidents]
-    baseline_b_results = [run_episode_baseline_b(scorer, inc, args.step_budget) for inc in test_incidents]
+    baseline_b_results = [run_episode_baseline_b(scorer, inc, args.step_budget, seed=args.seed) for inc in test_incidents]
     greedy_results = [run_episode_greedy(scorer, inc, args.step_budget) for inc in test_incidents]
 
     print()
