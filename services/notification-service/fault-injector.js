@@ -3,6 +3,26 @@ let memoryBuffer = [];
 let memoryInterval = null;
 let delayMs = 0;
 
+const fs = require('fs');
+const FAULT_STATE_FILE = '/tmp/pod_crash_state.json';
+
+(function resumeCrashLoopIfNeeded() {
+  try {
+    if (fs.existsSync(FAULT_STATE_FILE)) {
+      const state = JSON.parse(fs.readFileSync(FAULT_STATE_FILE, 'utf8'));
+      const elapsedSec = (Date.now() - state.startedAt) / 1000;
+      if (elapsedSec < state.durationSec) {
+        console.warn('Resuming pod_crash loop, ' + (state.durationSec - elapsedSec).toFixed(1) + 's remaining');
+        setTimeout(function() { process.exit(1); }, 500);
+      } else {
+        fs.unlinkSync(FAULT_STATE_FILE);
+      }
+    }
+  } catch (e) {
+    console.error('Failed to resume crash state', e);
+  }
+})();
+
 const SERVICE_NAME = process.env.SERVICE_NAME || 'notification-service';
 let activeFault = {
   active: false,
@@ -14,7 +34,6 @@ let activeFault = {
 };
 
 module.exports = {
-  // Middleware to inject network delay
   delayMiddleware: (req, res, next) => {
     if (delayMs > 0) {
       setTimeout(next, delayMs);
@@ -23,13 +42,11 @@ module.exports = {
     }
   },
 
-  // Inject a fault
   inject: (type, durationSec, config = {}) => {
-    console.log(`Injecting fault: ${type} for ${durationSec}s`);
-    
-    // Automatic Rollback Schedule
+    console.log('Injecting fault: ' + type + ' for ' + durationSec + 's');
+
     const rollback = () => {
-      console.log(`Rolling back fault: ${type}`);
+      console.log('Rolling back fault: ' + type);
       if (cpuInterval) {
         clearInterval(cpuInterval);
         cpuInterval = null;
@@ -42,6 +59,7 @@ module.exports = {
           global.gc();
         }
       }
+      if (fs.existsSync(FAULT_STATE_FILE)) fs.unlinkSync(FAULT_STATE_FILE);
       delayMs = 0;
       activeFault = {
         active: false,
@@ -69,7 +87,6 @@ module.exports = {
     switch (type) {
       case 'cpu_stress':
         if (cpuInterval) clearInterval(cpuInterval);
-        // Spin CPU in chunks to keep event loop somewhat responsive but high usage
         cpuInterval = setInterval(() => {
           const start = Date.now();
           while (Date.now() - start < 80) {
@@ -81,33 +98,39 @@ module.exports = {
       case 'memory_pressure':
         if (memoryInterval) clearInterval(memoryInterval);
         memoryBuffer = [];
+        const MAX_BUFFERS = 12;
         memoryInterval = setInterval(() => {
           try {
-            // Allocate ~20MB buffers
-            memoryBuffer.push(Buffer.alloc(20 * 1024 * 1024, 'x'));
+            if (memoryBuffer.length < MAX_BUFFERS) {
+              memoryBuffer.push(Buffer.alloc(20 * 1024 * 1024, 'x'));
+            }
           } catch (e) {
-            console.error('Memory limit reached or allocation failed', e);
+            console.error('Memory allocation failed', e);
             clearInterval(memoryInterval);
           }
         }, 200);
         break;
 
       case 'network_delay':
-        delayMs = config.delayMs || 2000; // default 2 seconds delay
+        delayMs = config.delayMs || 2000;
         break;
 
       case 'pod_crash':
         console.warn('Pod crashing! Exiting process...');
-        setTimeout(() => {
+        fs.writeFileSync(FAULT_STATE_FILE, JSON.stringify({
+          startedAt: Date.now(),
+          durationSec: durationSec
+        }));
+        setTimeout(function() {
           process.exit(1);
         }, 500);
         break;
 
       default:
-        console.error(`Unknown fault type: ${type}`);
+        console.error('Unknown fault type: ' + type);
     }
   },
-  
+
   getDelay: () => delayMs,
   getActiveFault: () => activeFault,
   reset: () => {
@@ -123,6 +146,7 @@ module.exports = {
         global.gc();
       }
     }
+    if (fs.existsSync(FAULT_STATE_FILE)) fs.unlinkSync(FAULT_STATE_FILE);
     delayMs = 0;
     activeFault = {
       active: false,
@@ -132,6 +156,6 @@ module.exports = {
       scheduled_duration_sec: 0,
       auto_rollback: true
     };
-    console.log(`Fault state cleanly reset.`);
+    console.log('Fault state cleanly reset.');
   }
 };
