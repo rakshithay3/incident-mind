@@ -1,4 +1,4 @@
-"""PPO dispatch interface and Baseline C greedy dispatch.
+"""PPO dispatch interface and Baseline A/B/C dispatch strategies.
 
 Action space is fixed at MAX_SERVICES=12 regardless of the incident's actual
 node count, so the same trained PPO policy transfers across RE1 (Online
@@ -12,6 +12,7 @@ to change shape.
 
 from __future__ import annotations
 
+import random
 from typing import Any, Iterable, List, Optional, Sequence, Set
 
 from .contracts import DispatchAction, DispatchDecision, NodeScore
@@ -47,6 +48,63 @@ def greedy_baseline_c(
         action=DispatchAction(agent_type=agent_type, target_service=top.service_id, instance_id=top.instance_id),
         policy_confidence=confidence,
     )
+
+
+def baseline_a(
+    scores: Iterable[NodeScore],
+    agent_type: str = "log",
+    visited: Optional[Set] = None,
+    seed: int = 0,
+) -> DispatchDecision:
+    """Baseline A: uniformly random dispatch among anomalous, not-yet-visited
+    nodes -- no ranking or score signal used at all, the floor a learned
+    policy has to beat.
+
+    Seeded so a given (seed, visited) state always dispatches the same node
+    -- reproducible across runs -- but the seed is combined with len(visited)
+    so successive steps within one episode draw independently instead of
+    repeating whatever index the same seed picks whenever the candidate
+    count happens to match.
+    """
+    candidates = [s for s in scores if s.status == "anomalous"]
+    if visited:
+        candidates = [s for s in candidates if _node_key(s) not in visited]
+    if not candidates:
+        raise ValueError("cannot dispatch without anomalous node scores")
+    rng = random.Random(seed + len(visited or ()))
+    pick = rng.choice(candidates)
+    confidence = max(0.0, min(1.0, pick.anomaly_score / 2.0))
+    return DispatchDecision(
+        step=1,
+        action=DispatchAction(agent_type=agent_type, target_service=pick.service_id, instance_id=pick.instance_id),
+        policy_confidence=confidence,
+    )
+
+
+def baseline_b(
+    scores: Iterable[NodeScore],
+    agent_type: str = "log",
+    visited: Optional[Set] = None,
+) -> DispatchDecision:
+    """Baseline B: threshold-only dispatch -- walk scores in arrival order
+    (whatever order the scorer emitted them in, NOT sorted by rank or
+    anomaly_score) and dispatch the first not-yet-visited node crossing the
+    anomaly threshold (status == "anomalous", the same flag GraphSAGEScorer
+    already sets). No priority/score-based ranking is used to pick among the
+    candidates that cross threshold -- only their arrival order does.
+    """
+    for s in scores:
+        if s.status != "anomalous":
+            continue
+        if visited and _node_key(s) in visited:
+            continue
+        confidence = max(0.0, min(1.0, s.anomaly_score / 2.0))
+        return DispatchDecision(
+            step=1,
+            action=DispatchAction(agent_type=agent_type, target_service=s.service_id, instance_id=s.instance_id),
+            policy_confidence=confidence,
+        )
+    raise ValueError("cannot dispatch without anomalous node scores")
 
 
 def decode_action(action_index: int, ranked_scores: Sequence[NodeScore]) -> DispatchAction:

@@ -1,5 +1,5 @@
-"""Evaluate the trained PPO dispatch policy against Baseline C (greedy
-dispatch) on the held-out RE1 test split.
+"""Evaluate the trained PPO dispatch policy against Baselines A, B, and C on
+the held-out RE1 test split.
 
 Uses the SAME 60/20/20 split (seed=42) as train_and_evaluate.py and
 train_ppo.py's default --split train, so this evaluates strictly on
@@ -7,10 +7,21 @@ incidents PPO never saw during training.
 
 This measures the RL orchestrator's core novelty claim in isolation: given
 identical anomaly scores from AnomalyScorer, does the learned dispatch
-policy solve incidents in fewer steps than always greedily picking the
-top-ranked node? Baseline C has no memory across steps, so if its first
-(and only) guess is wrong it never recovers within the step budget --
-PPO's observation includes visited-service history, so it can.
+policy solve incidents in fewer steps than three baselines with
+progressively less signal?
+
+  Baseline A -- uniformly random among anomalous nodes (the floor: no
+                ranking, no threshold-arrival ordering, no learning).
+  Baseline B -- threshold-only, arrival order (any signal beats none, but
+                still no ranking by anomaly_score).
+  Baseline C -- always greedily pick the top-ranked node, deterministically.
+                Has no memory across steps, so if its first (and only)
+                guess is wrong it never recovers within the step budget.
+
+PPO's observation includes visited-service history, so unlike Baseline C it
+can actually use a wrong first guess to inform its next one -- Baselines A
+and B are given the same multi-step, visited-aware chance within the step
+budget so the comparison isn't stacked against them by a single-shot check.
 
 Usage:
     PYTHONPATH=. python scripts/evaluate_ppo.py \
@@ -27,7 +38,7 @@ from pathlib import Path
 
 from stable_baselines3 import PPO
 
-from incidentmind_p1.dispatch import PPODispatcher, greedy_baseline_c
+from incidentmind_p1.dispatch import PPODispatcher, baseline_a, baseline_b, greedy_baseline_c
 from incidentmind_p1.loader import load_dataset
 from incidentmind_p1.scoring import AnomalyScorer
 
@@ -67,6 +78,32 @@ def run_episode_greedy(scorer: AnomalyScorer, incident, step_budget: int = STEP_
     return step_budget, False
 
 
+def run_episode_baseline_stepped(dispatch_fn, scorer: AnomalyScorer, incident, step_budget: int = STEP_BUDGET):
+    """Shared step loop for Baseline A and Baseline B -- unlike Baseline C,
+    both actually use the visited set to try a different node on each
+    retry (random re-roll for A, next-in-arrival-order for B), so they get
+    the same multi-step chance within the budget that PPO gets."""
+    ranked = sorted(scorer.score_graph(incident), key=lambda s: s.rank)
+    visited: set = set()
+    for step in range(1, step_budget + 1):
+        decision = dispatch_fn(ranked, visited=visited)
+        target = decision.action.target_service
+        visited.add(target)
+        if target == incident.root_cause:
+            return step, True
+    return step_budget, False
+
+
+def run_episode_baseline_a(scorer: AnomalyScorer, incident, step_budget: int = STEP_BUDGET, seed: int = 0):
+    return run_episode_baseline_stepped(
+        lambda ranked, visited: baseline_a(ranked, visited=visited, seed=seed), scorer, incident, step_budget
+    )
+
+
+def run_episode_baseline_b(scorer: AnomalyScorer, incident, step_budget: int = STEP_BUDGET):
+    return run_episode_baseline_stepped(baseline_b, scorer, incident, step_budget)
+
+
 def summarize(results, label: str):
     solved = [steps for steps, ok in results if ok]
     solve_rate = len(solved) / len(results)
@@ -83,7 +120,7 @@ def summarize(results, label: str):
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Evaluate PPO dispatch vs Baseline C on held-out RE1 test incidents")
+    parser = argparse.ArgumentParser(description="Evaluate PPO dispatch vs Baselines A/B/C on held-out RE1 test incidents")
     parser.add_argument("--dataset", required=True)
     parser.add_argument("--model", required=True, help="path to trained PPO .zip from scripts/train_ppo.py")
     parser.add_argument("--seed", type=int, default=42, help="must match the seed used to train the policy")
@@ -117,15 +154,20 @@ def main() -> None:
     dispatcher = PPODispatcher(policy=policy)
 
     ppo_results = [run_episode_ppo(dispatcher, scorer, inc, args.step_budget) for inc in test_incidents]
+    baseline_a_results = [run_episode_baseline_a(scorer, inc, args.step_budget, seed=args.seed) for inc in test_incidents]
+    baseline_b_results = [run_episode_baseline_b(scorer, inc, args.step_budget) for inc in test_incidents]
     greedy_results = [run_episode_greedy(scorer, inc, args.step_budget) for inc in test_incidents]
 
     print()
     ppo_summary = summarize(ppo_results, "PPO")
+    baseline_a_summary = summarize(baseline_a_results, "Baseline A")
+    baseline_b_summary = summarize(baseline_b_results, "Baseline B")
     greedy_summary = summarize(greedy_results, "Baseline C")
 
     print()
-    delta_solve = ppo_summary["solve_rate"] - greedy_summary["solve_rate"]
-    print(f"PPO solve rate advantage over Baseline C: {delta_solve:+.3f}")
+    print(f"PPO solve rate advantage over Baseline A (random):    {ppo_summary['solve_rate'] - baseline_a_summary['solve_rate']:+.3f}")
+    print(f"PPO solve rate advantage over Baseline B (threshold): {ppo_summary['solve_rate'] - baseline_b_summary['solve_rate']:+.3f}")
+    print(f"PPO solve rate advantage over Baseline C (greedy):    {ppo_summary['solve_rate'] - greedy_summary['solve_rate']:+.3f}")
 
 
 if __name__ == "__main__":

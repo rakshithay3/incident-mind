@@ -6,6 +6,8 @@ from incidentmind_p1.dispatch import (
     AGENT_TYPES,
     MAX_SERVICES,
     PPODispatcher,
+    baseline_a,
+    baseline_b,
     build_observation,
     decode_action,
 )
@@ -130,6 +132,57 @@ class DispatchEnvTest(unittest.TestCase):
             _, _, terminated, truncated, _ = self.env.step(wrong_slot)
         self.assertFalse(terminated)
         self.assertTrue(truncated)
+
+
+def _mixed_status_scores(statuses):
+    return [
+        NodeScore(service_id=f"svc-{i}", anomaly_score=float(len(statuses) - i), embedding_dim=128, status=status, rank=i + 1)
+        for i, status in enumerate(statuses)
+    ]
+
+
+class BaselineATest(unittest.TestCase):
+    def test_only_picks_anomalous_nodes(self):
+        scores = _mixed_status_scores(["normal", "anomalous", "normal", "anomalous"])
+        for seed in range(10):
+            decision = baseline_a(scores, seed=seed)
+            self.assertIn(decision.action.target_service, {"svc-1", "svc-3"})
+
+    def test_skips_visited_nodes(self):
+        scores = _mixed_status_scores(["anomalous", "anomalous"])
+        decision = baseline_a(scores, visited={"svc-0"}, seed=0)
+        self.assertEqual(decision.action.target_service, "svc-1")
+
+    def test_same_seed_and_visited_state_is_reproducible(self):
+        scores = _mixed_status_scores(["anomalous"] * 5)
+        first = baseline_a(scores, seed=7)
+        second = baseline_a(scores, seed=7)
+        self.assertEqual(first.action.target_service, second.action.target_service)
+
+    def test_raises_when_no_anomalous_candidates_remain(self):
+        scores = _mixed_status_scores(["normal", "normal"])
+        with self.assertRaises(ValueError):
+            baseline_a(scores)
+
+
+class BaselineBTest(unittest.TestCase):
+    def test_dispatches_first_anomalous_in_arrival_order_not_rank(self):
+        # svc-0 is ranked #1 (highest anomaly_score) but is NOT anomalous;
+        # svc-1 is ranked lower but comes first among anomalous nodes in
+        # arrival order -- Baseline B must ignore rank entirely.
+        scores = _mixed_status_scores(["normal", "anomalous", "anomalous"])
+        decision = baseline_b(scores)
+        self.assertEqual(decision.action.target_service, "svc-1")
+
+    def test_skips_visited_nodes_in_arrival_order(self):
+        scores = _mixed_status_scores(["anomalous", "anomalous"])
+        decision = baseline_b(scores, visited={"svc-0"})
+        self.assertEqual(decision.action.target_service, "svc-1")
+
+    def test_raises_when_no_anomalous_candidates_remain(self):
+        scores = _mixed_status_scores(["normal", "normal"])
+        with self.assertRaises(ValueError):
+            baseline_b(scores)
 
 
 class PPODispatcherTest(unittest.TestCase):
