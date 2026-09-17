@@ -8,10 +8,13 @@ import AnomalyTimelineTab from './components/tabs/AnomalyTimelineTab'
 import RCAPanelTab from './components/tabs/RCAPanelTab'
 import RemediationLogTab from './components/tabs/RemediationLogTab'
 import EvaluationTab from './components/tabs/EvaluationTab'
+import PriorityQueueTab from './components/tabs/PriorityQueueTab'
 import { useIncidentData } from './hooks/useIncidentData'
+import { useMultiInstanceData } from './hooks/useMultiInstanceData'
 
 const TAB_COMPONENTS = {
   alerts: AlertFeedTab,
+  queue: PriorityQueueTab,
   timeline: AnomalyTimelineTab,
   rca: RCAPanelTab,
   remediation: RemediationLogTab,
@@ -20,7 +23,8 @@ const TAB_COMPONENTS = {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('alerts')
-  const { incident, isLive, liveDemoMode, setLiveDemo } = useIncidentData()
+  const { incident, isLive, liveDemoMode, setLiveDemo, refreshMs } = useIncidentData()
+  const multiInstance = useMultiInstanceData(refreshMs)
   const ActiveTabComponent = TAB_COMPONENTS[activeTab]
 
   return (
@@ -62,7 +66,7 @@ export default function App() {
 
         <section className="tabs-section">
           <TabNav activeTab={activeTab} onChange={setActiveTab} />
-          <ActiveTabComponent incident={incident} />
+          <ActiveTabComponent incident={incident} multiInstance={multiInstance} />
         </section>
       </main>
     </div>

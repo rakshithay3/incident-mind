@@ -51,6 +51,18 @@ export const mockIncident = {
     { source: 'search-service', target: 'product-service', call_count: 40 }
   ],
   fault_injection_state: 'active',
+  // Example notifier output so the incident card has something to show in
+  // mock mode (shape: notifications/notifier.py _record()).
+  notifications: [
+    {
+      event: 'dispatch_threshold',
+      incident_id: 'inc_001',
+      status: 'dry_run',
+      timestamp: '2026-06-20T10:15:04Z',
+      reason: 'SMTP creds or recipients not set',
+      details: { target_service: 'auth-service', priority_score: 1.42, threshold: 0.5 }
+    }
+  ],
   metrics: {
     pr_at_1: 0.0,
     pr_at_3: 1.0,

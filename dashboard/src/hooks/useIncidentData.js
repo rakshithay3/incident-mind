@@ -13,7 +13,7 @@ import { transformDemoResult } from '../data/transformDemoResult'
 //    watching a fault get injected in front of an audience and 5 minutes of
 //    staleness would look broken.
 //
-// TO GO LIVE: after running
+// TO GO LIVE: after running (from the repo root)
 //   PYTHONPATH=. python3 live_demo.py --fault cpu_stress --output demo_result.json
 // copy the resulting demo_result.json into public/demoResult.json. No code
 // change needed -- this hook picks it up on the next poll.

@@ -1,11 +1,15 @@
-// Wireframe only — real-time alert stream arrives once Archie's
-// Prometheus/Jaeger exports are live (Weeks 3-5 sync point).
+import IncidentCard from '../IncidentCard'
+
+// Incident card (with email notification status) on top of the alert list.
+// Real-time alert stream arrives once Archie's Prometheus/Jaeger exports are
+// live (Weeks 3-5 sync point).
 
 export default function AlertFeedTab({ incident }) {
   const anomalous = incident.nodes.filter(n => n.status === 'anomalous')
 
   return (
     <div className="tab-panel">
+      <IncidentCard incident={incident} />
       <div className="wireframe-note">
         Wireframe — will stream live alerts once ShopMind telemetry is connected.
       </div>

@@ -1,5 +1,6 @@
 export const TABS = [
   { id: 'alerts', label: 'Alert Feed' },
+  { id: 'queue', label: 'Priority Queue' },
   { id: 'timeline', label: 'Anomaly Timeline' },
   { id: 'rca', label: 'RCA Panel' },
   { id: 'remediation', label: 'Remediation Log' },

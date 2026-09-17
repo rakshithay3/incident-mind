@@ -1,4 +1,5 @@
 import { STATIC_EDGES } from './topology'
+import { impactTier, impactWeight } from './impactWeights'
 
 // Converts the raw JSON written by live_demo.py OR replay_demo.py
 // (--output demo_result.json) into the exact shape every dashboard
@@ -27,8 +28,91 @@ export function transformDemoResult(raw) {
     edges: raw.edges && raw.edges.length > 0 ? raw.edges : STATIC_EDGES,
     fault_injection_state: raw.fault_injection_state ?? 'resolved',
     metrics: raw.metrics ?? { pr_at_1: 0, pr_at_3: 0, pr_at_5: 0 },
-    ppo_dispatch: raw.ppo_dispatch ?? null,
+    ppo_dispatch: normalizeDispatch(raw.ppo_dispatch),
+    multi_fault_detected: raw.multi_fault_detected ?? [],
     evidence_bundle: raw.evidence_bundle ?? null,
-    report: raw.report ?? null
+    report: raw.report ?? null,
+    // Email hook results from notifications/notifier.py. Missing on runs
+    // made before the hooks existed, or with --no-notify.
+    notifications: Array.isArray(raw.notifications) ? raw.notifications : []
   }
+}
+
+// replay_demo.py writes ppo_dispatch flat ({agent_type, target_service,
+// policy_confidence}); DispatchDecision.to_json() nests it under "action"
+// with a "step". Components read the nested form, so normalise here.
+function normalizeDispatch(d) {
+  if (!d) return null
+  const action = d.action ?? {
+    agent_type: d.agent_type,
+    target_service: d.target_service,
+    instance_id: d.instance_id ?? null
+  }
+  return { step: d.step ?? 1, action, policy_confidence: d.policy_confidence ?? 0 }
+}
+
+// multiInstanceResult.json from cross_instance_dispatch_demo.py --output.
+export function transformMultiInstanceResult(raw) {
+  return {
+    source: 'multi',
+    generated_at: raw.generated_at ?? null,
+    instances: raw.instances ?? [],
+    queue: raw.queue ?? [],
+    dispatches: raw.dispatches ?? [],
+    notifications: raw.notifications ?? []
+  }
+}
+
+// Fallback when no multi-instance run exists: treat the loaded incident as
+// one instance and apply the same priority weighting the backend uses.
+export function deriveSingleInstanceQueue(incident) {
+  const target = incident.ppo_dispatch?.action?.target_service
+  const dispatchNote = latestNotification(incident.notifications, 'dispatch_threshold')
+  const queue = incident.nodes
+    .filter(n => n.status === 'anomalous')
+    .map(n => {
+      const weight = impactWeight(n.service_id)
+      return {
+        instance_id: 'local',
+        service_id: n.service_id,
+        anomaly_score: n.anomaly_score,
+        impact_tier: impactTier(n.service_id),
+        impact_weight: weight,
+        priority_score: n.anomaly_score * weight
+      }
+    })
+    .sort((a, b) => b.priority_score - a.priority_score)
+    .map((row, i) => {
+      const dispatched = row.service_id === target
+      return {
+        ...row,
+        rank: i + 1,
+        dispatch_step: dispatched ? 1 : null,
+        agent_type: dispatched ? incident.ppo_dispatch.action.agent_type : null,
+        notification_status: dispatched ? dispatchNote?.status ?? null : null
+      }
+    })
+
+  return {
+    source: 'single',
+    generated_at: incident.timestamp || null,
+    instances: [
+      {
+        instance_id: 'local',
+        incident_id: incident.incident_id,
+        fault_type: incident.fault_type,
+        target_service: incident.injected_target,
+        anomalous_count: queue.length,
+        status: 'scored'
+      }
+    ],
+    queue,
+    dispatches: [],
+    notifications: incident.notifications ?? []
+  }
+}
+
+export function latestNotification(notifications, event) {
+  const matches = (notifications ?? []).filter(n => n.event === event)
+  return matches.length ? matches[matches.length - 1] : null
 }
