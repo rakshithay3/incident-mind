@@ -47,6 +47,7 @@ from incidentmind_p1.gnn_scorer import GraphSAGEScorer
 from incidentmind_p1.training import load_checkpoint
 from priority.impact_weights import PriorityWeightedScorer
 from multi_fault import detect_multi_fault
+from notifications.notifier import Notifier
 
 CPU_RATIO_TO_PERCENT = 100.0
 MS_TO_SECONDS = 1.0 / 1000.0
@@ -219,7 +220,10 @@ def main() -> None:
     parser.add_argument("--ppo-model", default="models/ppo_dispatch.zip")
     parser.add_argument("--code-repo-path", default=None, help="Git repo path for the Code Agent (e.g. Archie's ShopMind checkout)")
     parser.add_argument("--output", default="demo_result.json")
+    parser.add_argument("--no-notify", action="store_true", help="Disable email notification hooks")
     args = parser.parse_args()
+
+    notifier = None if args.no_notify else Notifier()
 
     incident_dir = Path(args.incident_dir)
     telemetry_path = incident_dir / "telemetry_series.json"
@@ -266,6 +270,12 @@ def main() -> None:
     else:
         print(f"  Note: PPO dispatched to {top_service}, true root cause is {telemetry['target_service']}.")
 
+    notifications = []
+    if notifier is not None:
+        notifications.append(
+            notifier.notify_dispatch(incident.incident_id, decision, ranked, fault_type=telemetry["fault_type"])
+        )
+
     print("[4/5] Running live investigation (Ollama agents + report) using REAL captured evidence...")
     from schemas.contracts import DispatchAction
     from pipeline import run_investigation
@@ -290,7 +300,10 @@ def main() -> None:
         telemetry_path=str(telemetry_path),
         log_path=str(log_path) if log_path.exists() else None,
         code_path=args.code_repo_path,
+        notifier=notifier,
     )
+    if investigation.get("notification"):
+        notifications.append(investigation["notification"])
 
     print(f"  Root cause identified: {investigation['report']['root_cause_service']}")
     print(f"  Confidence: {investigation['report']['confidence_score']}")
@@ -318,6 +331,7 @@ def main() -> None:
         },
         "evidence_bundle": investigation["evidence_bundle"],
         "report": investigation["report"],
+        "notifications": notifications,
         "metrics": {
             "pr_at_1": 1.0 if ranked[0].service_id == telemetry["target_service"] else 0.0,
             "pr_at_3": 1.0 if telemetry["target_service"] in {s.service_id for s in ranked[:3]} else 0.0,
