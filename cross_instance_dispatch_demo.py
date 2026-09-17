@@ -10,6 +10,7 @@ instance's ranking at a time.
 """
 
 import argparse
+import json
 
 import requests
 from stable_baselines3 import PPO
@@ -21,6 +22,7 @@ from replay_demo import compile_live_snapshot
 from priority.cross_instance_queue import CrossInstancePriorityQueue
 from priority.global_dispatch import GlobalPPODispatcher
 from notifications.notifier import Notifier
+from priority.result_export import build_multi_instance_result
 
 
 def main():
@@ -29,6 +31,8 @@ def main():
     parser.add_argument("--graphsage-model", default="models/graphsage.pt")
     parser.add_argument("--ppo-model", default="models/ppo_dispatch.zip")
     parser.add_argument("--no-notify", action="store_true", help="Disable email notification hooks")
+    parser.add_argument("--output", default=None,
+                        help="Write queue + dispatches as JSON for the dashboard (copy to dashboard/public/multiInstanceResult.json)")
     args = parser.parse_args()
     notifier = None if args.no_notify else Notifier()
 
@@ -48,16 +52,28 @@ def main():
     queue = CrossInstancePriorityQueue()
 
     incident_ids = {}
+    instances = []
     for instance_id, telemetry in snapshots.items():
         incident_ids[instance_id] = telemetry.get("incident_id", instance_id)
+        summary = {
+            "instance_id": instance_id,
+            "incident_id": telemetry.get("incident_id"),
+            "fault_type": telemetry.get("fault_type"),
+            "target_service": telemetry.get("target_service"),
+            "anomalous_count": 0,
+            "status": "scored",
+        }
+        instances.append(summary)
         print(f"\n[{instance_id}] Scoring incident {telemetry.get('incident_id')}...")
         try:
             incident = compile_live_snapshot(telemetry)
             scores = base_scorer.score_graph(incident)
         except (KeyError, ValueError) as e:
             print(f"  SKIPPED: malformed telemetry from this instance ({e})")
+            summary["status"] = "skipped"
             continue
         added = queue.add_instance_scores(instance_id, scores)
+        summary["anomalous_count"] = added
         print(f"  {added} anomalous node(s) added to global queue")
 
     print(f"\n=== Global priority queue: {len(queue)} total anomalous node(s) across all instances ===")
@@ -65,18 +81,26 @@ def main():
     policy = PPO.load(args.ppo_model)
     dispatcher = GlobalPPODispatcher(queue, policy=policy)
     global_ranked = queue.ranked_snapshot()
+    decisions, notifications = [], []
     for decision in dispatcher.dispatch_all():
+        decisions.append(decision)
         action = decision.action
         print(
             f"  #{decision.step} [{action.instance_id}] agent={action.agent_type:<8} "
             f"target={action.target_service:<22} confidence={decision.policy_confidence:.2f}"
         )
         if notifier is not None:
-            notifier.notify_dispatch(
+            notifications.append(notifier.notify_dispatch(
                 incident_ids.get(action.instance_id, action.instance_id or "unknown"),
                 decision,
                 global_ranked,
-            )
+            ))
+
+    if args.output:
+        result = build_multi_instance_result(instances, global_ranked, decisions, notifications)
+        with open(args.output, "w") as f:
+            json.dump(result, f, indent=2)
+        print(f"\nSaved to {args.output}")
 
 
 if __name__ == "__main__":
