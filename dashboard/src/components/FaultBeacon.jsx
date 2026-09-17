@@ -4,18 +4,18 @@
 // happening right now" is the first question a live audience asks.
 
 const STATE_COPY = {
-  none: { label: 'No active incident', dot: 'dot-none' },
-  scheduled: { label: 'Fault scheduled', dot: 'dot-scheduled' },
-  active: { label: 'Fault active', dot: 'dot-active' },
-  resolved: { label: 'Resolved', dot: 'dot-resolved' }
+  none: { label: 'No active incident', cls: 'beacon-none' },
+  scheduled: { label: 'Fault scheduled', cls: 'beacon-scheduled' },
+  active: { label: 'Fault active', cls: 'beacon-active' },
+  resolved: { label: 'Resolved', cls: 'beacon-resolved' }
 }
 
 export default function FaultBeacon({ state = 'none' }) {
   const copy = STATE_COPY[state] ?? STATE_COPY.none
 
   return (
-    <div className="fault-beacon">
-      <span className={`beacon-dot ${copy.dot}`} />
+    <div className={`fault-beacon ${copy.cls}`} role="status">
+      <span className="beacon-dot" />
       <span className="beacon-label">{copy.label}</span>
     </div>
   )

@@ -22,7 +22,7 @@ export default function AnomalyTimelineTab({ incident }) {
     svg.selectAll('*').remove()
 
     const maxScore = Math.max(1, ...nodes.map(n => n.anomaly_score))
-    const x = d3.scaleLinear().domain([0, maxScore]).range([120, width - 60])
+    const x = d3.scaleLinear().domain([0, maxScore]).range([160, width - 60])
 
     const rows = svg
       .append('g')
@@ -40,12 +40,12 @@ export default function AnomalyTimelineTab({ incident }) {
 
     rows
       .append('rect')
-      .attr('x', 120)
+      .attr('x', 160)
       .attr('y', 4)
-      .attr('height', rowHeight - 10)
-      .attr('width', d => x(d.anomaly_score) - 120)
-      .attr('fill', d => (d.status === 'anomalous' ? '#E8544B' : '#3FB88A'))
-      .attr('opacity', d => (d.status === 'anomalous' ? 0.9 : 0.5))
+      .attr('height', rowHeight - 12)
+      .attr('width', d => Math.max(2, x(d.anomaly_score) - 160))
+      .attr('rx', 3)
+      .attr('class', d => `timeline-bar ${d.status === 'anomalous' ? 'is-anomalous' : ''}`)
 
     rows
       .append('text')

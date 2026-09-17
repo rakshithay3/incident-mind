@@ -51,16 +51,19 @@ export const mockIncident = {
     { source: 'search-service', target: 'product-service', call_count: 40 }
   ],
   fault_injection_state: 'active',
-  // Example notifier output so the incident card has something to show in
-  // mock mode (shape: notifications/notifier.py _record()).
+  // Example notifier output so the dashboard has something to show in mock
+  // mode (shape: notifications/notifier.py _record()).
+  recovery: { recovered: false, restored_at: null, polls: 12, still_unhealthy: ['auth-service'] },
   notifications: [
     {
-      event: 'dispatch_threshold',
+      event: 'service_restored',
       incident_id: 'inc_001',
-      status: 'dry_run',
-      timestamp: '2026-06-20T10:15:04Z',
-      reason: 'SMTP creds or recipients not set',
-      details: { target_service: 'auth-service', priority_score: 1.42, threshold: 0.5 }
+      status: 'skipped',
+      timestamp: '2026-06-20T10:18:00Z',
+      recipients_count: 0,
+      sent_count: 0,
+      reason: 'ShopMind not back to normal after 180s, users not emailed',
+      details: { still_unhealthy: ['auth-service'] }
     }
   ],
   metrics: {

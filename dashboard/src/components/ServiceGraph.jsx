@@ -6,11 +6,14 @@ import * as d3 from 'd3'
 // noted in the roadmap — this file is the first pass, refine the scale once
 // the real feature groupings are finalized with Rakshitha).
 
-function scoreToColor(score) {
-  // 0 -> calm teal, ~1.4+ -> alert coral. Interpolated, not stepped,
-  // so partial anomalies read as "warming up" rather than binary on/off.
-  const t = Math.min(score / 1.4, 1)
-  return d3.interpolateRgb('#3FB88A', '#E8544B')(t)
+function nodeFill(d) {
+  // Theme tokens (not hex) so the graph follows light/dark mode. Mixing
+  // red into green reads as muddy brown, so colour follows status and
+  // score only sets how strong the colour is.
+  const t = Math.min(Math.max(d.anomaly_score, 0), 1)
+  return d.status === 'anomalous'
+    ? `color-mix(in srgb, var(--danger) ${Math.round(65 + 35 * t)}%, var(--surface))`
+    : `color-mix(in srgb, var(--node-ok) ${Math.round(55 + 45 * t)}%, var(--surface))`
 }
 
 export default function ServiceGraph({ nodes, edges, width = 640, height = 420 }) {
@@ -32,19 +35,18 @@ export default function ServiceGraph({ nodes, edges, width = 640, height = 420 }
 
     const link = svg
       .append('g')
-      .attr('stroke', '#24304A')
-      .attr('stroke-opacity', 0.8)
       .selectAll('line')
       .data(linkData)
       .join('line')
-      .attr('stroke-width', d => Math.max(1, Math.log(d.call_count) - 2))
+      .attr('class', 'graph-link')
+      .attr('stroke-width', d => Math.max(1, Math.log(d.call_count ?? 1) - 2))
 
     const node = svg
       .append('g')
       .selectAll('g')
       .data(nodeData)
       .join('g')
-      .attr('class', 'graph-node')
+      .attr('class', d => `graph-node ${d.status === 'anomalous' ? 'is-anomalous' : ''}`)
       .call(
         d3
           .drag()
@@ -66,17 +68,15 @@ export default function ServiceGraph({ nodes, edges, width = 640, height = 420 }
 
     node
       .append('circle')
-      .attr('r', d => (d.status === 'anomalous' ? 16 : 12))
-      .attr('fill', d => scoreToColor(d.anomaly_score))
-      .attr('stroke', d => (d.status === 'anomalous' ? '#E8544B' : '#24304A'))
-      .attr('stroke-width', d => (d.status === 'anomalous' ? 2 : 1))
+      .attr('r', d => (d.status === 'anomalous' ? 15 : 11))
+      .style('fill', nodeFill)
       .attr('class', d => (d.status === 'anomalous' ? 'pulse-ring' : ''))
 
     node
       .append('text')
       .text(d => d.service_id)
       .attr('x', 0)
-      .attr('y', 26)
+      .attr('y', d => (d.status === 'anomalous' ? 28 : 24))
       .attr('text-anchor', 'middle')
       .attr('class', 'graph-label')
 
@@ -85,6 +85,11 @@ export default function ServiceGraph({ nodes, edges, width = 640, height = 420 }
       .text(d => `${d.service_id}\nscore: ${d.anomaly_score.toFixed(2)}\nrank: ${d.rank}`)
 
     simulation.on('tick', () => {
+      // keep nodes (and their labels) inside the viewBox
+      for (const d of nodeData) {
+        d.x = Math.max(60, Math.min(width - 60, d.x))
+        d.y = Math.max(24, Math.min(height - 36, d.y))
+      }
       link
         .attr('x1', d => d.source.x)
         .attr('y1', d => d.source.y)
@@ -98,8 +103,15 @@ export default function ServiceGraph({ nodes, edges, width = 640, height = 420 }
   }, [nodes, edges, width, height])
 
   return (
-    <svg ref={svgRef} viewBox={`0 0 ${width} ${height}`} className="service-graph">
-      {/* populated by d3 */}
-    </svg>
+    <>
+      <svg ref={svgRef} viewBox={`0 0 ${width} ${height}`} className="service-graph" role="img" aria-label="Service dependency graph">
+        {/* populated by d3 */}
+      </svg>
+      <div className="graph-legend">
+        <span><i className="legend-dot" style={{ background: 'var(--node-ok)' }} />normal</span>
+        <span><i className="legend-dot" style={{ background: 'var(--danger)' }} />anomalous</span>
+        <span>drag nodes to rearrange</span>
+      </div>
+    </>
   )
 }

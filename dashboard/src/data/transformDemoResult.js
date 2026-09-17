@@ -32,8 +32,9 @@ export function transformDemoResult(raw) {
     multi_fault_detected: raw.multi_fault_detected ?? [],
     evidence_bundle: raw.evidence_bundle ?? null,
     report: raw.report ?? null,
-    // Email hook results from notifications/notifier.py. Missing on runs
-    // made before the hooks existed, or with --no-notify.
+    // Recovery check + "ShopMind is back" user email (notifications/).
+    // Missing on runs made before those existed, or with --no-notify.
+    recovery: raw.recovery ?? null,
     notifications: Array.isArray(raw.notifications) ? raw.notifications : []
   }
 }
@@ -58,8 +59,7 @@ export function transformMultiInstanceResult(raw) {
     generated_at: raw.generated_at ?? null,
     instances: raw.instances ?? [],
     queue: raw.queue ?? [],
-    dispatches: raw.dispatches ?? [],
-    notifications: raw.notifications ?? []
+    dispatches: raw.dispatches ?? []
   }
 }
 
@@ -67,7 +67,6 @@ export function transformMultiInstanceResult(raw) {
 // one instance and apply the same priority weighting the backend uses.
 export function deriveSingleInstanceQueue(incident) {
   const target = incident.ppo_dispatch?.action?.target_service
-  const dispatchNote = latestNotification(incident.notifications, 'dispatch_threshold')
   const queue = incident.nodes
     .filter(n => n.status === 'anomalous')
     .map(n => {
@@ -88,8 +87,7 @@ export function deriveSingleInstanceQueue(incident) {
         ...row,
         rank: i + 1,
         dispatch_step: dispatched ? 1 : null,
-        agent_type: dispatched ? incident.ppo_dispatch.action.agent_type : null,
-        notification_status: dispatched ? dispatchNote?.status ?? null : null
+        agent_type: dispatched ? incident.ppo_dispatch.action.agent_type : null
       }
     })
 
@@ -107,12 +105,12 @@ export function deriveSingleInstanceQueue(incident) {
       }
     ],
     queue,
-    dispatches: [],
-    notifications: incident.notifications ?? []
+    dispatches: []
   }
 }
 
-export function latestNotification(notifications, event) {
-  const matches = (notifications ?? []).filter(n => n.event === event)
+// Latest "ShopMind is back" email status for this incident, if any.
+export function restoredNotification(incident) {
+  const matches = (incident.notifications ?? []).filter(n => n.event === 'service_restored')
   return matches.length ? matches[matches.length - 1] : null
 }

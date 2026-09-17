@@ -1,24 +1,24 @@
-import IncidentCard from '../IncidentCard'
+import CustomerNotification from '../CustomerNotification'
 
-// Incident card (with email notification status) on top of the alert list.
-// Real-time alert stream arrives once Archie's Prometheus/Jaeger exports are
-// live (Weeks 3-5 sync point).
+// Customer email status on top, then one row per anomalous service.
+// Real-time alert streaming arrives once Archie's Prometheus/Jaeger exports
+// are live.
 
 export default function AlertFeedTab({ incident }) {
-  const anomalous = incident.nodes.filter(n => n.status === 'anomalous')
+  const anomalous = [...incident.nodes]
+    .filter(n => n.status === 'anomalous')
+    .sort((a, b) => a.rank - b.rank)
 
   return (
     <div className="tab-panel">
-      <IncidentCard incident={incident} />
-      <div className="wireframe-note">
-        Wireframe — will stream live alerts once ShopMind telemetry is connected.
-      </div>
+      <CustomerNotification incident={incident} />
+      <span className="section-label">Active alerts</span>
       <ul className="alert-list">
         {anomalous.map(n => (
           <li key={n.service_id} className="alert-item">
-            <span className="status-pill status-anomalous">alert</span>
+            <span className="status-pill status-anomalous">Alert</span>
             <span className="mono">{n.service_id}</span>
-            <span className="alert-detail">anomaly score {n.anomaly_score.toFixed(2)}</span>
+            <span className="alert-detail mono">score {n.anomaly_score.toFixed(2)}</span>
           </li>
         ))}
         {anomalous.length === 0 && <li className="alert-empty">No active alerts.</li>}

@@ -4,13 +4,15 @@
 
 export default function NodeListPanel({ nodes }) {
   const ranked = [...nodes].sort((a, b) => a.rank - b.rank)
+  const max = Math.max(1, ...nodes.map(n => n.anomaly_score))
 
   return (
     <div className="panel node-list-panel">
       <div className="panel-header">
-        <h2>Node List</h2>
+        <h2>Services</h2>
         <span className="panel-subtitle">ranked by anomaly score</span>
       </div>
+      <div className="table-scroll">
       <table className="node-table">
         <thead>
           <tr>
@@ -23,9 +25,16 @@ export default function NodeListPanel({ nodes }) {
         <tbody>
           {ranked.map(n => (
             <tr key={n.service_id} className={n.status === 'anomalous' ? 'row-anomalous' : ''}>
-              <td className="mono">{n.rank}</td>
-              <td>{n.service_id}</td>
-              <td className="mono">{n.anomaly_score.toFixed(2)}</td>
+              <td className="mono instance-muted">{n.rank}</td>
+              <td className="mono">{n.service_id}</td>
+              <td>
+                <div className="score-cell">
+                  <div className="score-bar">
+                    <div className="score-fill" style={{ width: `${(n.anomaly_score / max) * 100}%` }} />
+                  </div>
+                  <span className="mono">{n.anomaly_score.toFixed(2)}</span>
+                </div>
+              </td>
               <td>
                 <span className={`status-pill status-${n.status}`}>{n.status}</span>
               </td>
@@ -33,6 +42,7 @@ export default function NodeListPanel({ nodes }) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

@@ -1,11 +1,10 @@
 import { useMemo } from 'react'
 import { deriveSingleInstanceQueue } from '../../data/transformDemoResult'
-import { NotifyPill } from '../NotificationStatus'
 
 // Global cross-instance priority queue (extension items 2 + 3):
 // every anomalous node from every connected ShopMind instance, ordered by
 // priority_score = anomaly_score x impact_weight, with the PPO dispatch
-// order and whether each dispatch email went out.
+// order.
 //
 // Source: multiInstanceResult.json when present, otherwise the loaded
 // incident treated as a single instance.
@@ -30,18 +29,18 @@ export default function PriorityQueueTab({ incident, multiInstance }) {
 
       <div className="instance-cards">
         {data.instances.map(inst => {
-          const sent = data.queue.filter(q => q.instance_id === inst.instance_id && q.notification_status === 'sent').length
+          const dispatched = data.queue.filter(q => q.instance_id === inst.instance_id && q.dispatch_step).length
           return (
             <div key={inst.instance_id} className={`instance-card ${inst.status === 'skipped' ? 'instance-skipped' : ''}`}>
               <div className="instance-card-head">
                 <span className="mono instance-id">{inst.instance_id}</span>
-                <span className="status-pill sev-unknown">{inst.status}</span>
+                <span className={`status-pill ${inst.status === 'skipped' ? 'sev-unknown' : 'status-normal'}`}>{inst.status}</span>
               </div>
               <div className="instance-card-body mono">
                 <div>{inst.incident_id ?? '—'}</div>
                 <div className="instance-muted">{inst.fault_type ?? 'unknown fault'}</div>
                 <div>
-                  {inst.anomalous_count} anomalous · {sent} alert{sent === 1 ? '' : 's'} sent
+                  {inst.anomalous_count} anomalous · {dispatched} dispatched
                 </div>
               </div>
             </div>
@@ -59,7 +58,6 @@ export default function PriorityQueueTab({ incident, multiInstance }) {
             <th>Anomaly</th>
             <th>Priority</th>
             <th>PPO</th>
-            <th>Email</th>
           </tr>
         </thead>
         <tbody>
@@ -89,14 +87,11 @@ export default function PriorityQueueTab({ incident, multiInstance }) {
               <td className="mono">
                 {row.dispatch_step ? `#${row.dispatch_step} ${row.agent_type}` : <span className="instance-muted">—</span>}
               </td>
-              <td>
-                <NotifyPill status={row.notification_status} />
-              </td>
             </tr>
           ))}
           {data.queue.length === 0 && (
             <tr>
-              <td colSpan={7} className="eval-pending">No anomalous nodes queued.</td>
+              <td colSpan={6} className="eval-pending">No anomalous nodes queued.</td>
             </tr>
           )}
         </tbody>

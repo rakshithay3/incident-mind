@@ -18,7 +18,7 @@ export default function RCAPanelTab({ incident }) {
       <ol className="rca-list">
         {ranked.map(n => (
           <li key={n.service_id} className={n.service_id === report?.root_cause_service ? 'rca-hit' : ''}>
-            <span className="mono">#{n.rank}</span> {n.service_id}
+            <span className="mono rca-rank">#{n.rank}</span> <span className="mono">{n.service_id}</span>
             <span className="rca-score mono"> score {n.anomaly_score.toFixed(2)}</span>
           </li>
         ))}
