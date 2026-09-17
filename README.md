@@ -1,147 +1,67 @@
-# IncidentMind P1: GNN + PPO Backbone
+# IncidentMind
 
-This repository contains Rakshitha's P1 workstream for IncidentMind: RCAEval ingestion, GraphSAGE-ready anomaly scoring, PPO dispatch contract output, and Baseline C greedy dispatch.
+Automated root cause analysis for microservice incidents: a GraphSAGE GNN scores every service, a PPO policy decides which specialist agent to dispatch where, and LLaMA 3.2 3B agents (Log, Metrics, Code, Report) produce an evidence-grounded RCA report. Capstone project, Dept. of CSE, B.M.S. College of Engineering.
 
-The code is intentionally runnable with only the Python standard library for first-commit verification. When `torch`, `torch_geometric`, and `stable-baselines3` are available, the same contracts can be used by the real GraphSAGE and PPO training paths.
-
-## What This Produces
-
-The P1 handoff JSON consumed by Dharunya's agents and Vismitha's dashboard:
-
-```json
-{
-  "incident_id": "inc_001",
-  "timestamp": "2026-06-20T10:15:00Z",
-  "nodes": [
-    {
-      "service_id": "auth-service",
-      "anomaly_score": 0.87,
-      "embedding_dim": 128,
-      "status": "anomalous",
-      "rank": 1
-    }
-  ],
-  "ppo_dispatch": {
-    "step": 1,
-    "action": {
-      "agent_type": "log",
-      "target_service": "auth-service"
-    },
-    "policy_confidence": 0.91
-  },
-  "metrics": {
-    "pr_at_1": 0.0,
-    "pr_at_3": 1.0,
-    "pr_at_5": 1.0,
-    "mttd_steps": 4
-  }
-}
+```
+ShopMind telemetry --> GraphSAGE anomaly scores --> priority weighting --> PPO dispatch
+      --> Log / Metrics / Code agents --> Report Agent --> email notification + dashboard
 ```
 
-## Quick Start
+## Repository layout
 
-```bash
-python3 -m incidentmind_p1.cli score --incident data/sample_rcaeval/incidents/inc_001.json
-python3 -m incidentmind_p1.cli validate --dataset data/sample_rcaeval
-python3 -m incidentmind_p1.cli baseline-c --incident data/sample_rcaeval/incidents/inc_001.json
-python3 -m unittest discover -s tests
+This `integration` branch merges the four contributor branches (histories preserved).
+
+| Path | What | Owner |
+| --- | --- | --- |
+| `incidentmind_p1/`, `scripts/`, `replay_demo.py`, `live_demo.py`, `live_inject_and_capture.py` | GraphSAGE + PPO pipeline, training, evaluation, demos | Rakshitha |
+| `priority/`, `multi_fault.py`, `multi_instance_receiver.py`, `cross_instance_dispatch_demo.py` | Extension: priority-weighted dispatch, multi-fault, multi-instance | Rakshitha |
+| `agents/`, `pipeline.py`, `schemas/`, `evaluation/`, `shopmind_adapter.py`, `sample_data/` | Multi-agent LLM investigation + 100-incident evaluation | Dharunya |
+| `notifications/` | Extension: email hooks (dispatch threshold, report complete) | Dharunya's item |
+| `services/`, `docker-compose.yml`, `export_metrics.py`, `package_evaluation.py`, `demo_replay_auth_cpu/` | ShopMind 12-service testbed, fault injection, telemetry export | Archie |
+| `dashboard/` | React + Vite console | Vismitha |
+
+Component READMEs: [P1](docs/README_p1.md) · [Agents](docs/README_agents.md) · [ShopMind](docs/README_shopmind.md) · Data contracts: [P1](docs/data_contract.md), [ShopMind exporter](docs/data_contract_shopmind.md) · [Demo runbook](docs/demo_runbook.md)
+
+## Setup
+
 ```
-
-## Roadmap Alignment
-
-- Weeks 1-3: RCAEval data contract, loaders, GraphSAGE-ready graph objects, training loop skeleton.
-- Weeks 4-7: anomaly scorer, PPO dispatch interface, fast inference output for dashboard and agents.
-- Weeks 9-11: Baseline C, PR@k, MTTD, cross-app generalization hooks.
-
-## Data Contract
-
-See [docs/data_contract.md](docs/data_contract.md) for the exact input and output schemas.
-
-## Full RE1 Run (VS Code / local shell)
-
-The steps above only exercise the dummy fixture (`inc_001.json`). To reproduce
-the real GraphSAGE training run on RCAEval RE1 (Online Boutique) locally:
-
-```bash
 python3 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -r requirements.txt
-
-# 1. Downloads RE1 (RE1-OB/SS/TT) via a local git clone of RCAEval and
-#    converts the ~125 Online Boutique cases into incidentmind_p1 incident
-#    JSONs under data/rcaeval_re1/incidents/. `pip install RCAEval` is
-#    broken upstream, so this clones the source instead -- see
-#    docs/data_contract.md.
-python3 scripts/prepare_re1_data.py
-
-# 2. Trains GraphSAGE (60/20/20 train/val/test split, FeatureStats fit only
-#    on train) and reports PR@1 / PR@3 / PR@5 / MTTD against a random
-#    baseline. Add --print-per-incident for the full per-incident report.
-python3 scripts/train_and_evaluate.py --epochs 50 --print-per-incident
+ollama pull llama3.2:3b
+cd dashboard && npm install
 ```
 
-Expect the first run to take a few minutes: the RE1 download is a few
-hundred MB, and `torch_geometric` install can be slow depending on your
-platform's wheel availability. Re-running `prepare_re1_data.py` is a no-op
-if `data/RE1/RE1-OB` already exists.
+Model checkpoints (`models/graphsage.pt`, `models/ppo_dispatch.zip`) and RE1 data are not in git.
 
-**Notes carried over from the Colab run:**
-- FeatureStats must be fit once on the training split and reused at
-  inference -- never refit on the incident being scored or on ShopMind.
-- RE1's real file layout is `RE1-OB/{service}_{fault}/{instance}/data.csv`,
-  not the `metrics.json` layout implied by some docs.
-- The Online Boutique service dependency graph is hardcoded in
-  `scripts/prepare_re1_data.py` (`ONLINE_BOUTIQUE_EDGES`) since RE1 does not
-  ship topology data.
+## Run the demo (replay)
 
-## ShopMind Cross-Topology Evaluation
-
-ShopMind (Archie's 12-service Docker testbed) is a held-out generalization
-check only -- it is never used to fit `FeatureStats` or retrain GraphSAGE.
-The evaluation dataset (`shopmind_evaluation_dataset.zip`) is packaged on
-`archie/rakshithay3/incident-mind` and pulled locally, not committed here.
-
-```bash
-# 1. Pull and unzip the latest packaged ShopMind incidents
-git fetch origin archie/rakshithay3/incident-mind
-git show "origin/archie/rakshithay3/incident-mind:shopmind_evaluation_dataset.zip" \
-    > /tmp/shopmind_evaluation_dataset.zip
-unzip -o /tmp/shopmind_evaluation_dataset.zip -d ~/Desktop/shopmind_evaluation_dataset
-
-# 2. Sanity-check that ShopMind's raw feature scales still match RE1's after
-#    z-normalization with the RE1-fitted FeatureStats. Any row flagged
-#    "FAR FROM N(0,1)" means the GraphSAGE checkpoint is seeing
-#    out-of-distribution inputs -- fix the exporter before trusting any
-#    downstream number.
-python3 scripts/diagnose_feature_scale.py \
-    --re1-dataset data/rcaeval_re1 \
-    --shopmind-dataset ~/Desktop/shopmind_evaluation_dataset \
-    --graphsage-model models/graphsage.pt
-
-# 3. Run the full ShopMind evaluation (PPO vs Baseline C solve rate)
-python3 scripts/evaluate_shopmind.py \
-    --dataset ~/Desktop/shopmind_evaluation_dataset \
-    --model models/ppo_dispatch.zip \
-    --graphsage-model models/graphsage.pt
-
-# 4. Break solve rate down by hop-distance between the scorer's top-ranked
-#    node and the true root cause. This separates a genuine cross-topology /
-#    cascading-failure generalization limit (solve rate high at hop=0,
-#    dropping as hop-distance grows) from a lingering data/scale artifact
-#    (solve rate low even at hop=0).
-python3 scripts/diagnose_shopmind_failures.py \
-    --dataset ~/Desktop/shopmind_evaluation_dataset \
-    --model models/ppo_dispatch.zip \
-    --graphsage-model models/graphsage.pt
+Tab 1:
+```
+ollama serve
+```
+Tab 2:
+```
+PYTHONPATH=. python3 replay_demo.py --incident-dir output/live_test_cpu_stress --graphsage-model models/graphsage.pt --ppo-model models/ppo_dispatch.zip --output demo_result.json
+cp demo_result.json dashboard/public/demoResult.json
+```
+Tab 3:
+```
+cd dashboard && npm run dev
 ```
 
-**Known data-contract gotchas (fixed in `archie/rakshithay3/incident-mind`
-commit `7d9c4f6`, tag `v1.0.0-eval-freeze`):** ShopMind's Prometheus export
-uses different units than RE1 for three of the five features. If
-`diagnose_feature_scale.py` flags any of these, check the exporter first:
-- `cpu`: fraction (0-1) instead of percent (0-100)
-- `latency` / `p99_latency`: milliseconds instead of seconds
-- `memory`: usage/limit ratio instead of raw bytes -- this one cannot be
-  fixed by a scale factor; it must be reconstructed as
-  `mem_pct * mem_limit_bytes` using the `mem_limit` values declared per
-  service in ShopMind's `docker-compose.yml`.
+Multi-instance view: run `multi_instance_receiver.py`, have each instance POST telemetry, then
+```
+PYTHONPATH=. python3 cross_instance_dispatch_demo.py --output multi_instance_result.json
+cp multi_instance_result.json dashboard/public/multiInstanceResult.json
+```
+
+## Email notifications
+
+Set `IM_SMTP_USER`, `IM_SMTP_PASSWORD` (Gmail app password) and `IM_NOTIFY_TO`. Without them the notifier writes `.eml` files to `output/notifications/` instead of sending. Disable with `--no-notify`. Check creds with `PYTHONPATH=. python3 scripts/send_test_notification.py`.
+
+## Tests
+
+```
+PYTHONPATH=. python3 -m unittest discover -s tests
+```
