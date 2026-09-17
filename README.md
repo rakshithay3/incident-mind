@@ -10,18 +10,17 @@ ShopMind telemetry --> GraphSAGE anomaly scores --> priority weighting --> PPO d
 
 ## Repository layout
 
-This `integration` branch merges the four contributor branches (histories preserved).
+| Path | What |
+| --- | --- |
+| `incidentmind_p1/`, `scripts/`, `replay_demo.py`, `live_demo.py`, `live_inject_and_capture.py` | GraphSAGE + PPO pipeline, training, evaluation, demos |
+| `priority/`, `multi_fault.py`, `multi_instance_receiver.py`, `cross_instance_dispatch_demo.py` | Priority-weighted dispatch, multi-fault detection, multi-instance telemetry |
+| `agents/`, `pipeline.py`, `schemas/`, `evaluation/`, `shopmind_adapter.py`, `sample_data/` | Multi-agent LLM investigation + 100-incident evaluation |
+| `notifications/` | Recovery check + "ShopMind is back to normal" email to registered users |
+| `services/`, `docker-compose.yml`, `export_metrics.py`, `package_evaluation.py`, `demo_replay_auth_cpu/` | ShopMind 12-service testbed, fault injection, telemetry export |
+| `dashboard/` | React + Vite console |
+| `paper/` | Paper draft and the evaluation scripts/results it cites |
 
-| Path | What | Owner |
-| --- | --- | --- |
-| `incidentmind_p1/`, `scripts/`, `replay_demo.py`, `live_demo.py`, `live_inject_and_capture.py` | GraphSAGE + PPO pipeline, training, evaluation, demos | Rakshitha |
-| `priority/`, `multi_fault.py`, `multi_instance_receiver.py`, `cross_instance_dispatch_demo.py` | Extension: priority-weighted dispatch, multi-fault, multi-instance | Rakshitha |
-| `agents/`, `pipeline.py`, `schemas/`, `evaluation/`, `shopmind_adapter.py`, `sample_data/` | Multi-agent LLM investigation + 100-incident evaluation | Dharunya |
-| `notifications/` | Extension: recovery check + "ShopMind is back to normal" email to registered users | Dharunya's item |
-| `services/`, `docker-compose.yml`, `export_metrics.py`, `package_evaluation.py`, `demo_replay_auth_cpu/` | ShopMind 12-service testbed, fault injection, telemetry export | Archie |
-| `dashboard/` | React + Vite console | Vismitha |
-
-Component READMEs: [P1](docs/README_p1.md) · [Agents](docs/README_agents.md) · [ShopMind](docs/README_shopmind.md) · Data contracts: [P1](docs/data_contract.md), [ShopMind exporter](docs/data_contract_shopmind.md) · [Demo runbook](docs/demo_runbook.md)
+Component READMEs: [GNN + PPO](docs/README_p1.md) · [Agents](docs/README_agents.md) · [ShopMind](docs/README_shopmind.md) · Data contracts: [GNN input/output](docs/data_contract.md), [ShopMind exporter](docs/data_contract_shopmind.md) · [Demo runbook](docs/demo_runbook.md)
 
 ## Setup
 
