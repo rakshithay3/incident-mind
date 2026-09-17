@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'shopmind-services'
+    static_configs:
+      - targets:
+          - 'auth-service:3001'
+          - 'user-service:3002'
+          - 'order-service:3003'
+          - 'payment-service:3004'
+          - 'inventory-service:3005'
+          - 'notification-service:3006'
+          - 'search-service:3007'
