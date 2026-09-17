@@ -193,7 +193,7 @@ def main() -> None:
 
     print("[5/6] Running live investigation (Ollama agents + report)...")
     from schemas.contracts import DispatchAction
-    from p2_pipeline import run_investigation
+    from pipeline import run_investigation
 
     top_service = decision.action.target_service
     actions = [

@@ -63,9 +63,11 @@ class DispatchRoutingTest(unittest.TestCase):
         self.assertEqual(result["target_service"], "auth-service")
         self.assertEqual(result["severity"], "high")
 
-    @patch("agents.metrics_agent.ollama.chat")
-    def test_metrics_agent_receives_dispatch_action_and_reads_target_service(self, mock_chat):
-        mock_chat.return_value = {"message": {"content": METRICS_OK}}
+    @patch("agents.metrics_agent.ollama.Client")
+    def test_metrics_agent_receives_dispatch_action_and_reads_target_service(self, mock_client):
+        # Metrics Agent now calls ollama.Client(host=..., timeout=...).chat(),
+        # not the module-level ollama.chat, so the Client is what gets mocked.
+        mock_client.return_value.chat.return_value = {"message": {"content": METRICS_OK}}
         # target_service must exist in sample_data/metrics.json for the
         # non-"no metrics found" branch; auth-service is used elsewhere in
         # the sample fixtures so it should be present.
@@ -96,21 +98,21 @@ class RunInvestigationTest(unittest.TestCase):
     matching the AgentFinding / EvidenceBundle / RCAReport shapes in
     incidentmind_p1/contracts.py."""
 
-    @patch("agents.report_agent.ollama.chat")
+    @patch("agents.report_agent.ollama.Client")
     @patch("agents.code_agent.subprocess.run")
     @patch("agents.code_agent.requests.post")
-    @patch("agents.metrics_agent.ollama.chat")
+    @patch("agents.metrics_agent.ollama.Client")
     @patch("agents.log_agent.ollama.chat")
     def test_full_investigation_produces_contract_shaped_report(
-        self, mock_log_chat, mock_metrics_chat, mock_code_post, mock_code_run, mock_report_chat
+        self, mock_log_chat, mock_metrics_client, mock_code_post, mock_code_run, mock_report_client
     ):
         mock_log_chat.return_value = {"message": {"content": LOG_OK}}
-        mock_metrics_chat.return_value = {"message": {"content": METRICS_OK}}
+        mock_metrics_client.return_value.chat.return_value = {"message": {"content": METRICS_OK}}
         mock_code_run.return_value.returncode = 0
         mock_code_run.return_value.stdout = "diff --git a/auth.py b/auth.py\n+ removed timeout guard"
         mock_code_post.return_value.raise_for_status = lambda: None
         mock_code_post.return_value.json.return_value = {"response": CODE_OK}
-        mock_report_chat.return_value = {"message": {"content": REPORT_OK}}
+        mock_report_client.return_value.chat.return_value = {"message": {"content": REPORT_OK}}
 
         actions = [
             DispatchAction(agent_type="log", target_service="auth-service"),
