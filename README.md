@@ -4,7 +4,8 @@ Automated root cause analysis for microservice incidents: a GraphSAGE GNN scores
 
 ```
 ShopMind telemetry --> GraphSAGE anomaly scores --> priority weighting --> PPO dispatch
-      --> Log / Metrics / Code agents --> Report Agent --> email notification + dashboard
+      --> Log / Metrics / Code agents --> Report Agent --> dashboard
+      --> wait until ShopMind is back to baseline --> "we're back" email to ShopMind users
 ```
 
 ## Repository layout
@@ -16,7 +17,7 @@ This `integration` branch merges the four contributor branches (histories preser
 | `incidentmind_p1/`, `scripts/`, `replay_demo.py`, `live_demo.py`, `live_inject_and_capture.py` | GraphSAGE + PPO pipeline, training, evaluation, demos | Rakshitha |
 | `priority/`, `multi_fault.py`, `multi_instance_receiver.py`, `cross_instance_dispatch_demo.py` | Extension: priority-weighted dispatch, multi-fault, multi-instance | Rakshitha |
 | `agents/`, `pipeline.py`, `schemas/`, `evaluation/`, `shopmind_adapter.py`, `sample_data/` | Multi-agent LLM investigation + 100-incident evaluation | Dharunya |
-| `notifications/` | Extension: email hooks (dispatch threshold, report complete) | Dharunya's item |
+| `notifications/` | Extension: recovery check + "ShopMind is back to normal" email to registered users | Dharunya's item |
 | `services/`, `docker-compose.yml`, `export_metrics.py`, `package_evaluation.py`, `demo_replay_auth_cpu/` | ShopMind 12-service testbed, fault injection, telemetry export | Archie |
 | `dashboard/` | React + Vite console | Vismitha |
 
@@ -56,9 +57,16 @@ PYTHONPATH=. python3 cross_instance_dispatch_demo.py --output multi_instance_res
 cp multi_instance_result.json dashboard/public/multiInstanceResult.json
 ```
 
-## Email notifications
+## User notifications
 
-Set `IM_SMTP_USER`, `IM_SMTP_PASSWORD` (Gmail app password) and `IM_NOTIFY_TO`. Without them the notifier writes `.eml` files to `output/notifications/` instead of sending. Disable with `--no-notify`. Check creds with `PYTHONPATH=. python3 scripts/send_test_notification.py`.
+After the RCA, `replay_demo.py` polls live ShopMind telemetry until every app service is back near its pre-fault baseline for 3 polls in a row, then emails every registered ShopMind user a short plain-language "we're back to normal" message (no RCA details). Guests and placeholder addresses (`@shopmind.io`, `@example.com`) are skipped, so register on ShopMind with a real email for a demo. If ShopMind isn't back within `--recovery-timeout` (default 180s), nobody is emailed.
+
+Set `IM_SMTP_USER` and `IM_SMTP_PASSWORD` (Gmail app password). Without them the emails are written to `output/notifications/` instead of sent. `--no-notify` skips the wait and the email.
+
+```
+PYTHONPATH=. python3 scripts/send_test_notification.py --list-users
+IM_NOTIFY_TO=you@gmail.com PYTHONPATH=. python3 scripts/send_test_notification.py
+```
 
 ## Tests
 

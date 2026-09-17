@@ -123,7 +123,6 @@ def run_investigation(
     telemetry_path=None,
     log_path=None,
     code_path=None,
-    notifier=None,
 ):
     """
     Run the complete IncidentMind investigation pipeline.
@@ -148,10 +147,6 @@ def run_investigation(
 
     The optional telemetry_path/log_path/code_path arguments are
     retained for compatibility with existing tests and scripts.
-
-    notifier (optional notifications.notifier.Notifier): when given, a
-    report_complete email fires once the Report Agent finishes. Its
-    status dict is returned under "notification".
     """
 
     # ---------------------------------------------------------
@@ -192,15 +187,7 @@ def run_investigation(
 
     print(f"RCA report saved to: {output_file}")
 
-    # ---------------------------------------------------------
-    # 4. Report-complete notification hook (best-effort)
-    # ---------------------------------------------------------
-    notification = None
-    if notifier is not None:
-        notification = notifier.notify_report(incident_id, report)
-
     return {
         "evidence_bundle": evidence_bundle,
         "report": report,
-        "notification": notification,
     }

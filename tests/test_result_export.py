@@ -28,8 +28,7 @@ class MultiInstanceResultExportTest(unittest.TestCase):
     def test_queue_and_dispatch_shape(self):
         ranked = self.queue.ranked_snapshot()
         decisions = list(GlobalPPODispatcher(self.queue, policy=None).dispatch_all())
-        notes = [{"status": "sent"}, {"status": "sent"}, {"status": "skipped"}]
-        result = build_multi_instance_result(self.instances, ranked, decisions, notes)
+        result = build_multi_instance_result(self.instances, ranked, decisions)
 
         json.dumps(result)  # must be serialisable
         self.assertEqual(len(result["queue"]), 3)  # normal node excluded by queue
@@ -40,7 +39,6 @@ class MultiInstanceResultExportTest(unittest.TestCase):
         self.assertEqual(top["impact_tier"], "high")
         self.assertEqual(top["priority_score"], 0.9)
         self.assertEqual(top["dispatch_step"], 1)
-        self.assertEqual(top["notification_status"], "sent")
 
         # search-service has the higher raw score but is low tier -> last
         last = result["queue"][-1]
@@ -50,13 +48,6 @@ class MultiInstanceResultExportTest(unittest.TestCase):
         # same service name on two instances stays two distinct rows
         auth_rows = [q for q in result["queue"] if q["service_id"] == "auth-service"]
         self.assertEqual({q["instance_id"] for q in auth_rows}, {"mac-a", "mac-b"})
-
-    def test_no_notifications(self):
-        ranked = self.queue.ranked_snapshot()
-        decisions = list(GlobalPPODispatcher(self.queue, policy=None).dispatch_all())
-        result = build_multi_instance_result(self.instances, ranked, decisions)
-        self.assertTrue(all(q["notification_status"] is None for q in result["queue"]))
-        self.assertEqual(result["notifications"], [])
 
 
 if __name__ == "__main__":

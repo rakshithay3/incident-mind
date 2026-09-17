@@ -21,7 +21,6 @@ from incidentmind_p1.gnn_scorer import GraphSAGEScorer
 from replay_demo import compile_live_snapshot
 from priority.cross_instance_queue import CrossInstancePriorityQueue
 from priority.global_dispatch import GlobalPPODispatcher
-from notifications.notifier import Notifier
 from priority.result_export import build_multi_instance_result
 
 
@@ -30,11 +29,9 @@ def main():
     parser.add_argument("--receiver-url", default="http://localhost:5001")
     parser.add_argument("--graphsage-model", default="models/graphsage.pt")
     parser.add_argument("--ppo-model", default="models/ppo_dispatch.zip")
-    parser.add_argument("--no-notify", action="store_true", help="Disable email notification hooks")
     parser.add_argument("--output", default=None,
                         help="Write queue + dispatches as JSON for the dashboard (copy to dashboard/public/multiInstanceResult.json)")
     args = parser.parse_args()
-    notifier = None if args.no_notify else Notifier()
 
     resp = requests.get(f"{args.receiver_url}/snapshots")
     resp.raise_for_status()
@@ -51,10 +48,8 @@ def main():
 
     queue = CrossInstancePriorityQueue()
 
-    incident_ids = {}
     instances = []
     for instance_id, telemetry in snapshots.items():
-        incident_ids[instance_id] = telemetry.get("incident_id", instance_id)
         summary = {
             "instance_id": instance_id,
             "incident_id": telemetry.get("incident_id"),
@@ -81,7 +76,7 @@ def main():
     policy = PPO.load(args.ppo_model)
     dispatcher = GlobalPPODispatcher(queue, policy=policy)
     global_ranked = queue.ranked_snapshot()
-    decisions, notifications = [], []
+    decisions = []
     for decision in dispatcher.dispatch_all():
         decisions.append(decision)
         action = decision.action
@@ -89,15 +84,9 @@ def main():
             f"  #{decision.step} [{action.instance_id}] agent={action.agent_type:<8} "
             f"target={action.target_service:<22} confidence={decision.policy_confidence:.2f}"
         )
-        if notifier is not None:
-            notifications.append(notifier.notify_dispatch(
-                incident_ids.get(action.instance_id, action.instance_id or "unknown"),
-                decision,
-                global_ranked,
-            ))
 
     if args.output:
-        result = build_multi_instance_result(instances, global_ranked, decisions, notifications)
+        result = build_multi_instance_result(instances, global_ranked, decisions)
         with open(args.output, "w") as f:
             json.dump(result, f, indent=2)
         print(f"\nSaved to {args.output}")

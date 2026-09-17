@@ -48,6 +48,8 @@ from incidentmind_p1.training import load_checkpoint
 from priority.impact_weights import PriorityWeightedScorer
 from multi_fault import detect_multi_fault
 from notifications.notifier import Notifier
+from notifications.recipients import get_recipients
+from notifications.recovery import wait_for_recovery
 
 CPU_RATIO_TO_PERCENT = 100.0
 MS_TO_SECONDS = 1.0 / 1000.0
@@ -213,6 +215,39 @@ def compile_live_snapshot(telemetry: dict) -> IncidentGraph:
     )
 
 
+def _fault_started_at(telemetry):
+    failure = telemetry.get("failure_history") or []
+    if not failure:
+        return None
+    first = failure[0]
+    return first.get("timestamp") or next(
+        (n.get("timestamp") for n in first.get("nodes", []) if n.get("timestamp")), None
+    )
+
+
+def _wait_for_shopmind(telemetry, timeout_sec, interval_sec):
+    """Poll live ShopMind telemetry until it's back near this incident's
+    baseline. If ShopMind/export_metrics isn't available at all, report
+    not-recovered rather than guessing -- users are only told it's fixed
+    when telemetry actually shows it."""
+    try:
+        from export_metrics import collect_all_telemetry, load_services
+        config = load_services()
+    except (ImportError, SystemExit, Exception) as exc:
+        print(f"  [recovery] live telemetry unavailable ({type(exc).__name__}), users not emailed")
+        return {"recovered": False, "restored_at": None, "polls": 0,
+                "still_unhealthy": ["telemetry unavailable"]}
+
+    def collect():
+        nodes, _edges = collect_all_telemetry(config, 10)
+        return nodes
+
+    return wait_for_recovery(
+        telemetry.get("baseline_history", []), collect,
+        timeout_sec=timeout_sec, interval_sec=interval_sec,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Replay a real ShopMind incident through the full live pipeline")
     parser.add_argument("--incident-dir", required=True, help="Directory with telemetry_series.json + service logs")
@@ -220,7 +255,11 @@ def main() -> None:
     parser.add_argument("--ppo-model", default="models/ppo_dispatch.zip")
     parser.add_argument("--code-repo-path", default=None, help="Git repo path for the Code Agent (e.g. Archie's ShopMind checkout)")
     parser.add_argument("--output", default="demo_result.json")
-    parser.add_argument("--no-notify", action="store_true", help="Disable email notification hooks")
+    parser.add_argument("--no-notify", action="store_true",
+                        help="Don't wait for recovery or email ShopMind users")
+    parser.add_argument("--recovery-timeout", type=float, default=180.0,
+                        help="Seconds to wait for ShopMind to return to baseline before giving up on the user email")
+    parser.add_argument("--recovery-interval", type=float, default=5.0)
     args = parser.parse_args()
 
     notifier = None if args.no_notify else Notifier()
@@ -235,7 +274,13 @@ def main() -> None:
 
     print(f"[1/5] Loaded incident {telemetry['incident_id']}: {telemetry['fault_type']} on {telemetry['target_service']}")
 
-    print("[2/5] Compiling live snapshot for GraphSAGE scoring...")
+    # Snapshot ShopMind's registered users now, before anything else: auth-
+    # service keeps accounts in memory, so a pod_crash on it would wipe them.
+    recipients_info = get_recipients() if notifier is not None else None
+    if recipients_info is not None:
+        print(f"  ShopMind users to notify on recovery: {len(recipients_info['recipients'])} ({recipients_info['source']})")
+
+    print("[2/6] Compiling live snapshot for GraphSAGE scoring...")
     incident = compile_live_snapshot(telemetry)
     n_snapshots = len(telemetry["failure_history"])
     print(f"  scored snapshot: peak-anomaly ({n_snapshots} snapshots in failure_history)")
@@ -243,7 +288,7 @@ def main() -> None:
         if n.service_id == telemetry["target_service"]:
             print(f"  target ({n.service_id}) features: {dict(n.features)}")
 
-    print("[3/5] Scoring with GraphSAGE + dispatching with PPO...")
+    print("[3/6] Scoring with GraphSAGE + dispatching with PPO...")
     encoder, stats = load_checkpoint(args.graphsage_model)
     scorer = GraphSAGEScorer(encoder, stats)
     scorer = PriorityWeightedScorer(scorer)
@@ -270,13 +315,7 @@ def main() -> None:
     else:
         print(f"  Note: PPO dispatched to {top_service}, true root cause is {telemetry['target_service']}.")
 
-    notifications = []
-    if notifier is not None:
-        notifications.append(
-            notifier.notify_dispatch(incident.incident_id, decision, ranked, fault_type=telemetry["fault_type"])
-        )
-
-    print("[4/5] Running live investigation (Ollama agents + report) using REAL captured evidence...")
+    print("[4/6] Running live investigation (Ollama agents + report) using REAL captured evidence...")
     from schemas.contracts import DispatchAction
     from pipeline import run_investigation
 
@@ -300,15 +339,33 @@ def main() -> None:
         telemetry_path=str(telemetry_path),
         log_path=str(log_path) if log_path.exists() else None,
         code_path=args.code_repo_path,
-        notifier=notifier,
     )
-    if investigation.get("notification"):
-        notifications.append(investigation["notification"])
 
     print(f"  Root cause identified: {investigation['report']['root_cause_service']}")
     print(f"  Confidence: {investigation['report']['confidence_score']}")
 
-    print("[5/5] Saving result...")
+    notifications, recovery = [], None
+    if notifier is not None:
+        print("[5/6] Waiting for ShopMind to return to normal before emailing users...")
+        recovery = _wait_for_shopmind(telemetry, args.recovery_timeout, args.recovery_interval)
+        if recovery["recovered"]:
+            reported = investigation["report"].get("root_cause_service")
+            affected = reported if reported and reported != "unknown" else top_service
+            fresh = get_recipients()  # pick up anyone who registered meanwhile
+            notifications.append(notifier.notify_restored(
+                incident.incident_id,
+                fresh["recipients"],
+                root_cause_service=affected,
+                started_at=_fault_started_at(telemetry),
+                restored_at=recovery["restored_at"],
+                recipients_source=fresh["source"],
+            ))
+        else:
+            notifications.append(notifier.notify_not_recovered(
+                incident.incident_id, recovery["still_unhealthy"], args.recovery_timeout
+            ))
+
+    print("[6/6] Saving result...")
     result = {
         "incident_id": incident.incident_id,
         "timestamp": incident.timestamp,
@@ -331,6 +388,7 @@ def main() -> None:
         },
         "evidence_bundle": investigation["evidence_bundle"],
         "report": investigation["report"],
+        "recovery": recovery,
         "notifications": notifications,
         "metrics": {
             "pr_at_1": 1.0 if ranked[0].service_id == telemetry["target_service"] else 0.0,
