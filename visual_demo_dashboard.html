@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShopMind Incident & RCA Visual Dashboard</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+    .pulse-target {
+      animation: pulse-ring 2s infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans p-6 min-h-screen">
+  <div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-5 gap-4">
+      <div>
+        <div class="flex items-center gap-3">
+          <span class="px-3 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 text-xs font-semibold rounded-full uppercase tracking-wider">Multi-Fault Visualizer</span>
+          <span class="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold rounded-full flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 15 Containers Online
+          </span>
+        </div>
+        <h1 class="text-2xl md:text-3xl font-bold mt-2 bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+          ShopMind RCA Evaluation & Chaos Telemetry
+        </h1>
+        <p class="text-sm text-slate-400 mt-1">Interactive Telemetry Graphs & Tables across all 4 Fault Scenarios</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="http://localhost:16686" target="_blank" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-medium rounded-lg border border-slate-700 flex items-center gap-2 transition">
+          <span>🔍 Jaeger Traces (:16686)</span>
+        </a>
+        <a href="http://localhost:9090" target="_blank" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-medium rounded-lg border border-slate-700 flex items-center gap-2 transition">
+          <span>📈 Prometheus UI (:9090)</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Scenario Selector Tabs -->
+    <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2 flex flex-wrap gap-2">
+      <button id="tab-1" onclick="switchScenario('1')" class="px-4 py-2.5 rounded-lg text-xs font-semibold transition flex items-center gap-2 bg-blue-600 text-white shadow-sm">
+        <span>⚡ Fault 1: CPU Stress</span>
+        <span class="text-[10px] bg-blue-700/80 px-1.5 py-0.5 rounded font-mono">auth-service</span>
+      </button>
+      <button id="tab-2" onclick="switchScenario('2')" class="px-4 py-2.5 rounded-lg text-xs font-semibold transition flex items-center gap-2 bg-slate-800/80 hover:bg-slate-800 text-slate-300">
+        <span>🧠 Fault 2: Memory Leak</span>
+        <span class="text-[10px] bg-slate-700/80 px-1.5 py-0.5 rounded font-mono">search-service</span>
+      </button>
+      <button id="tab-3" onclick="switchScenario('3')" class="px-4 py-2.5 rounded-lg text-xs font-semibold transition flex items-center gap-2 bg-slate-800/80 hover:bg-slate-800 text-slate-300">
+        <span>🌐 Fault 3: Network Delay</span>
+        <span class="text-[10px] bg-slate-700/80 px-1.5 py-0.5 rounded font-mono">payment-service</span>
+      </button>
+      <button id="tab-4" onclick="switchScenario('4')" class="px-4 py-2.5 rounded-lg text-xs font-semibold transition flex items-center gap-2 bg-slate-800/80 hover:bg-slate-800 text-slate-300">
+        <span>💀 Fault 4: Pod Crash</span>
+        <span class="text-[10px] bg-slate-700/80 px-1.5 py-0.5 rounded font-mono">inventory-service</span>
+      </button>
+    </div>
+
+    <!-- Active Scenario Banner -->
+    <div class="p-3.5 bg-slate-900/60 border border-slate-800 rounded-lg flex items-center justify-between text-xs">
+      <div class="flex items-center gap-2">
+        <span class="text-slate-400">Selected Scenario:</span>
+        <span id="banner-scenario-title" class="font-bold text-white">CPU Thread Starvation</span>
+        <span class="text-slate-500">|</span>
+        <span class="text-slate-400">Target Container:</span>
+        <code id="banner-target" class="text-rose-400 font-mono font-bold">shopmind-auth-service (:3001)</code>
+      </div>
+      <div class="text-slate-400">
+        Terminal CLI Command: <code id="banner-cmd" class="text-blue-400 font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-800">python demo_workflow.py --fault 1</code>
+      </div>
+    </div>
+
+    <!-- KPI Metric Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-sm">
+        <div class="text-xs text-slate-400 font-medium">Normal Checkout</div>
+        <div class="text-2xl font-bold text-emerald-400 mt-1">16.1 ms</div>
+        <div class="text-xs text-slate-500 mt-1">Saga Pipeline OK</div>
+      </div>
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-sm">
+        <div class="text-xs text-slate-400 font-medium">Degraded Latency (In-Fault)</div>
+        <div id="kpi-degraded-latency" class="text-2xl font-bold text-rose-400 mt-1">141.8 ms</div>
+        <div id="kpi-latency-delta" class="text-xs text-rose-500/80 font-medium mt-1">▲ +781% Slowdown (8.8×)</div>
+      </div>
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-sm">
+        <div class="text-xs text-slate-400 font-medium">Primary Anomaly Spike</div>
+        <div id="kpi-target-anomaly" class="text-2xl font-bold text-amber-400 mt-1">81.8% CPU</div>
+        <div id="kpi-anomaly-desc" class="text-xs text-amber-500/80 font-medium mt-1">From 0.9% baseline (90×)</div>
+      </div>
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-sm">
+        <div class="text-xs text-slate-400 font-medium">Rollback Settle Time</div>
+        <div id="kpi-settle-time" class="text-2xl font-bold text-blue-400 mt-1">2.50 s</div>
+        <div id="kpi-settle-desc" class="text-xs text-slate-500 mt-1">Instant thread release</div>
+      </div>
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-sm col-span-2 md:col-span-1">
+        <div class="text-xs text-slate-400 font-medium">GNN Top-1 Precision</div>
+        <div class="text-2xl font-bold text-purple-400 mt-1">0.510</div>
+        <div class="text-xs text-purple-400/80 font-medium mt-1">6.14× over Random (0.083)</div>
+      </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Chart 1: Time Series Graph -->
+      <div class="lg:col-span-2 bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 id="chart-title" class="text-base font-semibold text-white flex items-center gap-2">
+              <span>📊 Primary Metric Progression Over Time</span>
+            </h2>
+            <p id="chart-subtitle" class="text-xs text-slate-400">Baseline (0–10s) $\rightarrow$ Chaos Perturbation (10–30s) $\rightarrow$ Rollback Settle</p>
+          </div>
+          <div class="flex items-center gap-3 text-xs">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-1 bg-rose-500 rounded"></span> <span id="legend-target">auth-service (Target)</span></span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-1 bg-blue-500 rounded"></span> Healthy Bystanders</span>
+          </div>
+        </div>
+        <div class="relative h-64 w-full">
+          <canvas id="timelineChart" class="w-full h-full"></canvas>
+        </div>
+        <div class="flex justify-between items-center text-xs text-slate-500 border-t border-slate-800/80 pt-3 mt-2">
+          <span>0s: Baseline Verified</span>
+          <span class="text-rose-400 font-medium">10s: Fault Injected</span>
+          <span>30s: Emergency Reset</span>
+          <span id="label-settled-time" class="text-emerald-400 font-medium">Settled Cleanly</span>
+        </div>
+      </div>
+
+      <!-- Chart 2: Checkout Latency & Error Impact Bar Chart -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-sm flex flex-col justify-between">
+        <div>
+          <h2 class="text-base font-semibold text-white">⏱️ Transaction Latency Impact</h2>
+          <p class="text-xs text-slate-400 mt-0.5">End-to-end checkout execution time comparison</p>
+          <div class="mt-6 space-y-4">
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <span class="font-medium text-emerald-400">Normal Checkout (Stage 2)</span>
+                <span class="font-mono font-bold text-emerald-400">16.1 ms</span>
+              </div>
+              <div class="w-full bg-slate-800 rounded-full h-4 overflow-hidden">
+                <div class="bg-emerald-500 h-full rounded-full transition-all duration-700" style="width: 12%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <span id="bar-degraded-label" class="font-medium text-rose-400">During Active Fault</span>
+                <span id="bar-degraded-value" class="font-mono font-bold text-rose-400">141.8 ms</span>
+              </div>
+              <div class="w-full bg-slate-800 rounded-full h-4 overflow-hidden">
+                <div id="bar-degraded-fill" class="bg-rose-500 h-full rounded-full transition-all duration-700" style="width: 100%"></div>
+              </div>
+            </div>
+          </div>
+          <div class="mt-6 p-3 bg-slate-800/50 rounded-lg border border-slate-800 text-xs space-y-1.5">
+            <div class="font-medium text-slate-300">Failure Propagation Mechanism:</div>
+            <p id="scenario-explanation" class="text-slate-400 leading-relaxed">
+              When <code class="text-rose-300">auth-service</code>'s event loop is choked with 81.8% CPU, token validation calls from <code class="text-blue-300">order-service</code> back up in the socket queue, increasing checkout time by <strong>8.8×</strong>.
+            </p>
+          </div>
+        </div>
+        <div class="text-[11px] text-slate-500 pt-3 border-t border-slate-800/60 mt-4">
+          Measured live from <code class="text-slate-400">demo_workflow.py</code> checkout probes.
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Table 1: Detailed Telemetry Comparison -->
+    <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-base font-semibold text-white">📋 Live Per-Service Telemetry Breakdown</h2>
+          <p class="text-xs text-slate-400">Observed node feature vectors during the active chaos window</p>
+        </div>
+        <span id="table-badge" class="text-xs font-mono text-slate-400 bg-slate-800 px-2.5 py-1 rounded">Scenario: CPU Stress</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead>
+            <tr class="border-b border-slate-800 text-slate-400 font-semibold bg-slate-950/40">
+              <th class="py-3 px-4">Service Name</th>
+              <th class="py-3 px-4">Port</th>
+              <th class="py-3 px-4">Role</th>
+              <th class="py-3 px-4">Baseline CPU</th>
+              <th class="py-3 px-4">In-Fault Metric</th>
+              <th class="py-3 px-4">Memory</th>
+              <th class="py-3 px-4">Status & GNN Ground Truth</th>
+            </tr>
+          </thead>
+          <tbody id="telemetry-table-body" class="divide-y divide-slate-800/60 font-mono">
+            <!-- Dynamically injected via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Table 2: AI Model Generalization & Call Graph -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-sm">
+        <h2 class="text-base font-semibold text-white">🎯 GraphSAGE Inductive RCA Benchmark</h2>
+        <p class="text-xs text-slate-400 mt-1">Evaluated across 100 deterministic incidents on ShopMind (Zero-shot from Online Boutique)</p>
+        <div class="mt-4 overflow-hidden rounded-lg border border-slate-800">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-950/60 text-slate-400">
+              <tr>
+                <th class="py-2.5 px-3">Evaluation Metric</th>
+                <th class="py-2.5 px-3">Random Baseline</th>
+                <th class="py-2.5 px-3 text-purple-400">GraphSAGE Model</th>
+                <th class="py-2.5 px-3 text-emerald-400">Relative Lift</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60 font-mono">
+              <tr>
+                <td class="py-2.5 px-3 font-sans font-medium text-slate-200">PR@1 (Top-1 Accuracy)</td>
+                <td class="py-2.5 px-3 text-slate-400">0.083 (8.3%)</td>
+                <td class="py-2.5 px-3 font-bold text-purple-400">0.510 (51.0%)</td>
+                <td class="py-2.5 px-3 text-emerald-400 font-bold">+6.14×</td>
+              </tr>
+              <tr>
+                <td class="py-2.5 px-3 font-sans font-medium text-slate-200">PR@3 (Top-3 Recall)</td>
+                <td class="py-2.5 px-3 text-slate-400">0.250 (25.0%)</td>
+                <td class="py-2.5 px-3 font-bold text-purple-400">0.620 (62.0%)</td>
+                <td class="py-2.5 px-3 text-emerald-400 font-bold">+2.48×</td>
+              </tr>
+              <tr>
+                <td class="py-2.5 px-3 font-sans font-medium text-slate-200">PR@5 (Top-5 Recall)</td>
+                <td class="py-2.5 px-3 text-slate-400">0.417 (41.7%)</td>
+                <td class="py-2.5 px-3 font-bold text-purple-400">0.700 (70.0%)</td>
+                <td class="py-2.5 px-3 text-emerald-400 font-bold">+1.68×</td>
+              </tr>
+              <tr>
+                <td class="py-2.5 px-3 font-sans font-medium text-slate-200">MTTD (Detection Delay)</td>
+                <td class="py-2.5 px-3 text-slate-400">—</td>
+                <td class="py-2.5 px-3 text-purple-400 font-medium">3.54 steps</td>
+                <td class="py-2.5 px-3 text-slate-400">Sub-second</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Call Graph Visual Card -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-sm flex flex-col justify-between">
+        <div>
+          <h2 class="text-base font-semibold text-white">🌐 Microservice Call Graph Topology</h2>
+          <p class="text-xs text-slate-400 mt-1">12 Nodes and 16 Directed Dependency Edges mapped from Jaeger traces</p>
+          <div class="mt-4 p-4 bg-slate-950/60 rounded-lg border border-slate-800/80 flex flex-col items-center justify-center">
+            <!-- Dynamic SVG Dependency Graph -->
+            <svg viewBox="0 0 400 180" class="w-full max-w-sm h-40">
+              <!-- Edges -->
+              <line x1="200" y1="20" x2="100" y2="70" stroke="#475569" stroke-width="2" />
+              <line x1="200" y1="20" x2="200" y2="70" stroke="#475569" stroke-width="2" />
+              <line x1="200" y1="20" x2="300" y2="70" stroke="#475569" stroke-width="2" />
+              <line x1="100" y1="70" x2="60" y2="130" stroke="#475569" stroke-width="2" id="edge-order-auth" />
+              <line x1="100" y1="70" x2="150" y2="130" stroke="#475569" stroke-width="2" id="edge-order-pay" />
+              <line x1="100" y1="70" x2="250" y2="130" stroke="#475569" stroke-width="2" id="edge-order-inv" />
+              
+              <!-- Gateway -->
+              <circle cx="200" cy="20" r="14" fill="#3b82f6" />
+              <text x="200" y="24" font-size="8" fill="#ffffff" text-anchor="middle" font-weight="bold">Gateway</text>
+
+              <!-- Tier 1 -->
+              <circle cx="100" cy="70" r="14" fill="#64748b" id="node-order" />
+              <text x="100" y="74" font-size="7" fill="#ffffff" text-anchor="middle">Order</text>
+
+              <circle cx="200" cy="70" r="14" fill="#64748b" id="node-search" />
+              <text x="200" y="74" font-size="7" fill="#ffffff" text-anchor="middle">Search</text>
+
+              <circle cx="300" cy="70" r="14" fill="#64748b" id="node-user" />
+              <text x="300" y="74" font-size="7" fill="#ffffff" text-anchor="middle">User</text>
+
+              <!-- Tier 2 -->
+              <circle cx="60" cy="130" r="16" fill="#64748b" id="node-auth" />
+              <text x="60" y="134" font-size="7" fill="#ffffff" text-anchor="middle" font-weight="bold">AUTH</text>
+
+              <circle cx="150" cy="130" r="16" fill="#64748b" id="node-payment" />
+              <text x="150" y="134" font-size="6.5" fill="#ffffff" text-anchor="middle" font-weight="bold">PAY</text>
+
+              <circle cx="250" cy="130" r="16" fill="#64748b" id="node-inventory" />
+              <text x="250" y="134" font-size="6.5" fill="#ffffff" text-anchor="middle" font-weight="bold">INV</text>
+            </svg>
+            <div id="graph-caption" class="text-[11px] text-slate-400 mt-2 text-center">
+              Graph Neural Network isolates the anomaly target.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const scenarios = {
+      '1': {
+        title: 'CPU Thread Starvation',
+        target: 'auth-service',
+        port: ':3001',
+        cmd: 'python demo_workflow.py --fault 1',
+        degradedLatency: '141.8 ms',
+        latencyDelta: '▲ +781% Slowdown (8.8×)',
+        barWidth: '100%',
+        primaryAnomaly: '81.8% CPU',
+        anomalyDesc: 'From 0.9% baseline (90× spike)',
+        settleTime: '2.50 s',
+        settleDesc: 'Instant thread release (<1s)',
+        chartTitle: '📊 CPU Utilization Over Time (All Services)',
+        chartSubtitle: 'auth-service CPU spikes to 81.8% while bystanders remain flat at ~1%',
+        chartMetric: 'cpu',
+        peakVal: 81.8,
+        labelSettled: '32.5s: Settled Cleanly (2.50s)',
+        explanation: 'When <code class="text-rose-300">auth-service</code>\'s event loop is choked with 81.8% CPU, token verification calls from <code class="text-blue-300">order-service</code> back up in the socket queue, increasing checkout time by <strong>8.8×</strong>.',
+        targetNodeId: 'node-auth',
+        targetEdgeId: 'edge-order-auth',
+        tableBadge: 'Scenario 1: CPU Stress (auth-service)',
+        rows: [
+          { name: 'auth-service', port: ':3001', role: 'Auth & JWT', base: '0.9%', fault: '81.8% CPU (+90×)', mem: '10.2%', isTarget: true, status: '🚨 ROOT CAUSE DETECTED (Label: 1)' },
+          { name: 'user-service', port: ':3002', role: 'User Profiles', base: '0.9%', fault: '0.6% CPU', mem: '9.9%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'order-service', port: ':3003', role: 'Saga Orchestrator', base: '3.3%', fault: '0.1% CPU', mem: '10.4%', isTarget: false, status: 'Affected Caller (Label: 0)' },
+          { name: 'payment-service', port: ':3004', role: 'Payment Capture', base: '0.4%', fault: '0.6% CPU', mem: '10.1%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'inventory-service', port: ':3005', role: 'Stock Allocation', base: '1.0%', fault: '0.1% CPU', mem: '9.8%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'notification-service', port: ':3006', role: 'Email/SMS Dispatch', base: '0.9%', fault: '0.1% CPU', mem: '10.2%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'search-service', port: ':3007', role: 'Catalog Search', base: '0.5%', fault: '9.4% CPU', mem: '9.9%', isTarget: false, status: 'Healthy Bystander (Label: 0)' }
+        ]
+      },
+      '2': {
+        title: 'Heap Memory Exhaustion (Memory Leak)',
+        target: 'search-service',
+        port: ':3007',
+        cmd: 'python demo_workflow.py --fault 2',
+        degradedLatency: '48.2 ms',
+        latencyDelta: '▲ +199% Slowdown (3×)',
+        barWidth: '34%',
+        primaryAnomaly: '84.5% RAM',
+        anomalyDesc: 'Buffer allocation climb to 324MB',
+        settleTime: '5.41 s',
+        settleDesc: 'GC Sweep & buffer zeroing (~5s)',
+        chartTitle: '📊 Memory Footprint Growth (RAM)',
+        chartSubtitle: 'search-service progressively allocates 20MB chunks up to 384MB container cap',
+        chartMetric: 'mem',
+        peakVal: 84.5,
+        labelSettled: '35.4s: Settled Post-GC (5.41s)',
+        explanation: 'Progressive buffer allocations force the Node V8 engine to trigger synchronous Garbage Collection (GC) sweeps, causing periodic 50ms event-loop pauses on <code class="text-rose-300">search-service</code>.',
+        targetNodeId: 'node-search',
+        targetEdgeId: null,
+        tableBadge: 'Scenario 2: Memory Pressure (search-service)',
+        rows: [
+          { name: 'search-service', port: ':3007', role: 'Catalog Search', base: '9.8%', fault: '84.5% RAM (324MB)', mem: '84.5%', isTarget: true, status: '🚨 ROOT CAUSE DETECTED (Label: 1)' },
+          { name: 'auth-service', port: ':3001', role: 'Auth & JWT', base: '0.9%', fault: '10.2% RAM', mem: '10.2%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'user-service', port: ':3002', role: 'User Profiles', base: '0.9%', fault: '9.8% RAM', mem: '9.8%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'order-service', port: ':3003', role: 'Saga Orchestrator', base: '3.3%', fault: '10.3% RAM', mem: '10.3%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'payment-service', port: ':3004', role: 'Payment Capture', base: '0.4%', fault: '10.0% RAM', mem: '10.0%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'inventory-service', port: ':3005', role: 'Stock Allocation', base: '1.0%', fault: '9.6% RAM', mem: '9.6%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'notification-service', port: ':3006', role: 'Email/SMS Dispatch', base: '0.9%', fault: '10.1% RAM', mem: '10.1%', isTarget: false, status: 'Healthy Bystander (Label: 0)' }
+        ]
+      },
+      '3': {
+        title: 'Asymmetric RPC Network Delay',
+        target: 'payment-service',
+        port: ':3004',
+        cmd: 'python demo_workflow.py --fault 3',
+        degradedLatency: '2045.3 ms',
+        latencyDelta: '▲ +12,600% Delay (127×)',
+        barWidth: '100%',
+        primaryAnomaly: '2000 ms',
+        anomalyDesc: 'Downstream synthetic RPC lag',
+        settleTime: '2.32 s',
+        settleDesc: 'Socket retries drain (~2.3s)',
+        chartTitle: '📊 Asymmetric RPC Latency Cascade (ms)',
+        chartSubtitle: 'order-service hangs waiting 2000ms for payment response; payment CPU is idle',
+        chartMetric: 'lat',
+        peakVal: 95,
+        labelSettled: '32.3s: Settled Cleanly (2.32s)',
+        explanation: 'A classic <strong>Asymmetric Propagation</strong> failure: <code class="text-blue-300">order-service</code> exhibits huge 2000ms latency waiting for payment, while <code class="text-rose-300">payment-service</code> CPU is flat at 0.4%. The GNN correctly identifies payment as the cause, not order.',
+        targetNodeId: 'node-payment',
+        targetEdgeId: 'edge-order-pay',
+        tableBadge: 'Scenario 3: Network Delay (payment-service)',
+        rows: [
+          { name: 'payment-service', port: ':3004', role: 'Payment Capture', base: '0.4ms', fault: '+2000ms Delay', mem: '10.1%', isTarget: true, status: '🚨 ROOT CAUSE DETECTED (Label: 1)' },
+          { name: 'order-service', port: ':3003', role: 'Saga Orchestrator', base: '16.1ms', fault: '2045.3ms Latency', mem: '10.4%', isTarget: false, status: '⚠️ Blocked Caller (Label: 0)' },
+          { name: 'auth-service', port: ':3001', role: 'Auth & JWT', base: '0.6ms', fault: '0.7ms Latency', mem: '9.7%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'user-service', port: ':3002', role: 'User Profiles', base: '0.5ms', fault: '0.6ms Latency', mem: '9.7%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'inventory-service', port: ':3005', role: 'Stock Allocation', base: '0.8ms', fault: '0.9ms Latency', mem: '9.6%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'notification-service', port: ':3006', role: 'Email/SMS Dispatch', base: '0.7ms', fault: '0.8ms Latency', mem: '10.1%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'search-service', port: ':3007', role: 'Catalog Search', base: '1.2ms', fault: '1.3ms Latency', mem: '9.8%', isTarget: false, status: 'Healthy Bystander (Label: 0)' }
+        ]
+      },
+      '4': {
+        title: 'Instance Failure & Container Auto-Restart',
+        target: 'inventory-service',
+        port: ':3005',
+        cmd: 'python demo_workflow.py --fault 4',
+        degradedLatency: 'FAILED (500)',
+        latencyDelta: '❌ HTTP 500 Connection Refused',
+        barWidth: '100%',
+        primaryAnomaly: '100% Error',
+        anomalyDesc: 'CPU=0%, Mem=0MB, Error=1.0',
+        settleTime: '11.45 s',
+        settleDesc: 'Docker daemon reboot & settle (~11s)',
+        chartTitle: '📊 Error Rate & Availability Cascade',
+        chartSubtitle: 'inventory-service process exits; error rate jumps to 1.0 (100% failure) until container reboots',
+        chartMetric: 'err',
+        peakVal: 100,
+        labelSettled: '41.5s: Settled Post-Reboot (11.45s)',
+        explanation: 'Container process exits (`process.exit(1)`). All checkout sagas fail with HTTP 500. Docker auto-heals by relaunching the container. Our data contract encodes this state as `cpu=0, mem=0, err=1.0` to eliminate misleading healthy backfill.',
+        targetNodeId: 'node-inventory',
+        targetEdgeId: 'edge-order-inv',
+        tableBadge: 'Scenario 4: Pod Crash (inventory-service)',
+        rows: [
+          { name: 'inventory-service', port: ':3005', role: 'Stock Allocation', base: '0.0%', fault: 'Error=1.0 (OFFLINE)', mem: '0.0 MB', isTarget: true, status: '🚨 CRASHED ROOT CAUSE (Label: 1)' },
+          { name: 'order-service', port: ':3003', role: 'Saga Orchestrator', base: '0.0%', fault: 'Error=0.85 (Cascade)', mem: '10.4%', isTarget: false, status: '❌ 500 Failure (Label: 0)' },
+          { name: 'auth-service', port: ':3001', role: 'Auth & JWT', base: '0.0%', fault: '0.0% Errors', mem: '9.7%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'user-service', port: ':3002', role: 'User Profiles', base: '0.0%', fault: '0.0% Errors', mem: '9.7%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'payment-service', port: ':3004', role: 'Payment Capture', base: '0.0%', fault: '0.0% Errors', mem: '10.0%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'notification-service', port: ':3006', role: 'Email/SMS Dispatch', base: '0.0%', fault: '0.0% Errors', mem: '10.1%', isTarget: false, status: 'Healthy Bystander (Label: 0)' },
+          { name: 'search-service', port: ':3007', role: 'Catalog Search', base: '0.0%', fault: '0.0% Errors', mem: '9.8%', isTarget: false, status: 'Healthy Bystander (Label: 0)' }
+        ]
+      }
+    };
+
+    let activeKey = '1';
+
+    function switchScenario(key) {
+      activeKey = key;
+      const s = scenarios[key];
+
+      // Update Tabs
+      ['1', '2', '3', '4'].forEach(k => {
+        const tab = document.getElementById(`tab-${k}`);
+        if (k === key) {
+          tab.className = 'px-4 py-2.5 rounded-lg text-xs font-semibold transition flex items-center gap-2 bg-blue-600 text-white shadow-sm';
+        } else {
+          tab.className = 'px-4 py-2.5 rounded-lg text-xs font-semibold transition flex items-center gap-2 bg-slate-800/80 hover:bg-slate-800 text-slate-300';
+        }
+      });
+
+      // Update Banners & KPIs
+      document.getElementById('banner-scenario-title').innerText = s.title;
+      document.getElementById('banner-target').innerText = `shopmind-${s.target} (${s.port})`;
+      document.getElementById('banner-cmd').innerText = s.cmd;
+
+      document.getElementById('kpi-degraded-latency').innerText = s.degradedLatency;
+      document.getElementById('kpi-latency-delta').innerText = s.latencyDelta;
+      document.getElementById('kpi-target-anomaly').innerText = s.primaryAnomaly;
+      document.getElementById('kpi-anomaly-desc').innerText = s.anomalyDesc;
+      document.getElementById('kpi-settle-time').innerText = s.settleTime;
+      document.getElementById('kpi-settle-desc').innerText = s.settleDesc;
+
+      document.getElementById('chart-title').innerHTML = `<span>${s.chartTitle}</span>`;
+      document.getElementById('chart-subtitle').innerText = s.chartSubtitle;
+      document.getElementById('legend-target').innerText = `${s.target} (Target)`;
+      document.getElementById('label-settled-time').innerText = s.labelSettled;
+
+      document.getElementById('bar-degraded-value').innerText = s.degradedLatency;
+      document.getElementById('bar-degraded-fill').style.width = s.barWidth;
+      document.getElementById('scenario-explanation').innerHTML = s.explanation;
+      document.getElementById('table-badge').innerText = s.tableBadge;
+
+      // Update Table
+      const tbody = document.getElementById('telemetry-table-body');
+      tbody.innerHTML = s.rows.map(r => `
+        <tr class="${r.isTarget ? 'bg-rose-500/10 border-l-4 border-rose-500' : 'hover:bg-slate-800/30 transition'}">
+          <td class="py-3 px-4 font-bold ${r.isTarget ? 'text-rose-400 flex items-center gap-2' : 'text-slate-200'}">
+            ${r.isTarget ? '<span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>' : ''} ${r.name}
+          </td>
+          <td class="py-3 px-4 text-slate-400">${r.port}</td>
+          <td class="py-3 px-4 text-slate-400 font-sans">${r.role}</td>
+          <td class="py-3 px-4 text-emerald-400">${r.base}</td>
+          <td class="py-3 px-4 ${r.isTarget ? 'text-rose-400 font-bold text-sm' : 'text-slate-200'}">${r.fault}</td>
+          <td class="py-3 px-4 text-slate-300">${r.mem}</td>
+          <td class="py-3 px-4">
+            <span class="${r.isTarget ? 'px-2 py-0.5 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded text-[11px] font-sans font-bold' : 'text-emerald-400 font-sans'}">
+              ${r.status}
+            </span>
+          </td>
+        </tr>
+      `).join('');
+
+      // Update Graph SVG Highlights
+      ['node-auth', 'node-payment', 'node-inventory', 'node-search', 'node-user', 'node-order'].forEach(n => {
+        const el = document.getElementById(n);
+        if (el) {
+          el.setAttribute('fill', '#64748b');
+          el.classList.remove('pulse-target');
+        }
+      });
+      ['edge-order-auth', 'edge-order-pay', 'edge-order-inv'].forEach(e => {
+        const el = document.getElementById(e);
+        if (el) el.setAttribute('stroke', '#475569');
+      });
+
+      if (s.targetNodeId) {
+        const targetEl = document.getElementById(s.targetNodeId);
+        if (targetEl) {
+          targetEl.setAttribute('fill', '#ef4444');
+          targetEl.classList.add('pulse-target');
+        }
+      }
+      if (s.targetEdgeId) {
+        const edgeEl = document.getElementById(s.targetEdgeId);
+        if (edgeEl) edgeEl.setAttribute('stroke', '#ef4444');
+      }
+
+      document.getElementById('graph-caption').innerHTML = `Graph Neural Network isolates <span class="text-rose-400 font-bold">${s.target.toUpperCase()}</span> as root cause.`;
+
+      draw();
+    }
+
+    // Canvas line chart
+    const canvas = document.getElementById('timelineChart');
+    const ctx = canvas.getContext('2d');
+
+    function resize() {
+      canvas.width = canvas.parentElement.clientWidth * window.devicePixelRatio;
+      canvas.height = canvas.parentElement.clientHeight * window.devicePixelRatio;
+      draw();
+    }
+
+    function draw() {
+      const s = scenarios[activeKey];
+      const w = canvas.width;
+      const h = canvas.height;
+      const p = window.devicePixelRatio;
+      ctx.clearRect(0, 0, w, h);
+
+      // Grid lines
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1 * p;
+      for (let i = 0; i <= 4; i++) {
+        const y = h - (h / 4) * i;
+        ctx.beginPath();
+        ctx.moveTo(30 * p, y);
+        ctx.lineTo(w - 10 * p, y);
+        ctx.stroke();
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = `${9 * p}px sans-serif`;
+        const unit = s.chartMetric === 'lat' ? `${i * 500}ms` : `${i * 25}%`;
+        ctx.fillText(unit, 5 * p, y - 4 * p);
+      }
+
+      // X-Axis labels
+      const timeLabels = ['0s (Base)', '10s (Inject)', '20s', '30s (Rollback)', '40s (Clean)'];
+      timeLabels.forEach((lbl, idx) => {
+        const x = 40 * p + (idx / 4) * (w - 60 * p);
+        ctx.fillText(lbl, x - 15 * p, h - 5 * p);
+      });
+
+      // Bystander Line (flat ~1%)
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 2 * p;
+      ctx.beginPath();
+      for (let x = 40 * p; x < w - 10 * p; x += 5 * p) {
+        const noise = (Math.sin(x * 0.1) * 2 + 1);
+        const y = h - (noise / 100) * (h - 20 * p) - 15 * p;
+        if (x === 40 * p) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // Target Service Line
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 3.5 * p;
+      ctx.beginPath();
+      
+      const xStart = 40 * p;
+      const xInject = 40 * p + 0.25 * (w - 60 * p);
+      const xRollback = 40 * p + 0.75 * (w - 60 * p);
+      const xEnd = w - 10 * p;
+
+      // Base
+      ctx.moveTo(xStart, h - 0.01 * (h - 20 * p) - 15 * p);
+      ctx.lineTo(xInject, h - 0.01 * (h - 20 * p) - 15 * p);
+
+      // Spike or drop to peakVal
+      const peakFrac = Math.min(1.0, s.peakVal / 100.0);
+      const peakY = h - peakFrac * (h - 20 * p) - 15 * p;
+      ctx.lineTo(xInject + 10 * p, peakY);
+      
+      // Active fault plateau
+      for (let x = xInject + 10 * p; x < xRollback; x += 8 * p) {
+        const jitter = (Math.sin(x * 0.2) * 3);
+        ctx.lineTo(x, peakY + jitter * p);
+      }
+
+      // Rollback drop
+      ctx.lineTo(xRollback + 10 * p, h - 0.01 * (h - 20 * p) - 15 * p);
+      ctx.lineTo(xEnd, h - 0.01 * (h - 20 * p) - 15 * p);
+      ctx.stroke();
+    }
+
+    window.addEventListener('resize', resize);
+    setTimeout(() => {
+      switchScenario('1');
+      resize();
+    }, 50);
+  </script>
+</body>
+</html>

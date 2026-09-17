@@ -1,0 +1,49 @@
+# ---------- Python (P1 + agents) ----------
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.env
+.env.*
+
+# Datasets / checkpoints (too large for git)
+RCAEval_src/
+data/RE1/
+data/rcaeval_re1/
+models/
+shopmind_evaluation_dataset/
+
+# Pipeline runtime output (reports, notification .eml + log.jsonl, captures)
+output/
+demo_result.json
+
+# ---------- ShopMind testbed (Archie) ----------
+logs/
+*.log
+!demo_replay_auth_cpu/*.log
+npm-debug.log*
+pgdata/
+redisdata/
+adjacency.json
+validation_report.json
+datasets/
+datasets_compiled/
+code-agent-history/
+scratch/
+*.zip
+!shopmind_evaluation_dataset.zip
+!demo_replay_auth_cpu.zip
+
+# ---------- Dashboard (Vismitha) ----------
+node_modules/
+dashboard/dist/
+# live demo result copied in at run time
+dashboard/public/demoResult.json
+dashboard/public/multiInstanceResult.json
+
+# ---------- Editors / OS ----------
+.vscode/
+.idea/
+*.sw?
+.DS_Store
+Thumbs.db

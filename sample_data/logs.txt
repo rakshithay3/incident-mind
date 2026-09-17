@@ -1,0 +1,8 @@
+2026-09-04 10:14:20 auth-service INFO Starting authentication service
+2026-09-04 10:14:25 auth-service INFO Connected to database
+2026-09-04 10:14:30 auth-service INFO Request received from user-service
+2026-09-04 10:14:32 auth-service ERROR ECONNREFUSED: connection refused by user-service
+2026-09-04 10:14:33 auth-service ERROR Failed to communicate with user-service
+2026-09-04 10:14:35 auth-service WARNING Retrying connection
+2026-09-04 10:14:40 auth-service ERROR Connection retry failed
+2026-09-04 10:15:00 auth-service INFO Health check completed

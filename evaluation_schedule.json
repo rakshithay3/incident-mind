@@ -1,0 +1,402 @@
+[
+  {
+    "target": "payment-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "notification-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "auth-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "payment-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "user-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "user-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "order-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "inventory-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "order-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "user-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "search-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "inventory-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "notification-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "user-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "order-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "search-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "order-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "auth-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "search-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "notification-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "inventory-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "auth-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "notification-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "inventory-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "notification-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "notification-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "order-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "search-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "notification-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "search-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "user-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "payment-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "inventory-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "user-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "search-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "notification-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "order-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "user-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "inventory-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "auth-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "user-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "search-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "payment-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "payment-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "notification-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "inventory-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "user-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "auth-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "search-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "order-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "notification-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "notification-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "search-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "user-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "user-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "auth-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "user-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "payment-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "auth-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "search-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "user-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "search-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "auth-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "inventory-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "inventory-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "auth-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "order-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "inventory-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "auth-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "user-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "order-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "payment-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "inventory-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "order-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "payment-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "order-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "search-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "notification-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "inventory-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "inventory-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "user-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "notification-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "search-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "search-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "payment-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "auth-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "auth-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "payment-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "order-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "payment-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "order-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "notification-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "auth-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "auth-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "auth-service",
+    "fault": "cpu_stress"
+  },
+  {
+    "target": "inventory-service",
+    "fault": "pod_crash"
+  },
+  {
+    "target": "user-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "order-service",
+    "fault": "memory_pressure"
+  },
+  {
+    "target": "payment-service",
+    "fault": "network_delay"
+  },
+  {
+    "target": "inventory-service",
+    "fault": "memory_pressure"
+  }
+]
