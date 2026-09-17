@@ -1,0 +1,370 @@
+\documentclass[conference,a4paper]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage[hidelinks]{hyperref}
+% Page geometry matched to the IEEE A4 conference Word template:
+% top 0.75in, bottom 1in, left/right 0.63in, column gap 0.25in
+\usepackage[a4paper, top=54pt, bottom=72pt, left=45pt, right=45pt, columnsep=18pt]{geometry}
+\def\IEEEkeywordsname{Keywords}
+
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{\sc e}\kern-.125emX}}
+
+\begin{document}
+
+\title{IncidentMind: Cross-Topology Root Cause Analysis for Microservices with GraphSAGE, Learned Dispatch and LLM Agents}
+
+\author{\setlength{\tabcolsep}{0pt}%
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}ccc}
+\begin{tabular}[t]{@{}c@{}}{\fontsize{11}{13}\selectfont Rakshitha Yathiraj}\\\textit{Dept. of Computer Science \& Engg.}\\\textit{B.M.S. College of Engineering}\\Bengaluru, India\\ rakshitha.raj004@gmail.com\end{tabular} &
+\begin{tabular}[t]{@{}c@{}}{\fontsize{11}{13}\selectfont \textcolor{red}{Author Name}}\\\textit{Dept. of Computer Science \& Engg.}\\\textit{B.M.S. College of Engineering}\\Bengaluru, India\\ \textcolor{red}{email address}\end{tabular} &
+\begin{tabular}[t]{@{}c@{}}{\fontsize{11}{13}\selectfont \textcolor{red}{Author Name}}\\\textit{Dept. of Computer Science \& Engg.}\\\textit{B.M.S. College of Engineering}\\Bengaluru, India\\ \textcolor{red}{email address}\end{tabular}
+\end{tabular*}\\[12pt]
+\begin{tabular*}{0.72\textwidth}{@{\extracolsep{\fill}}cc}
+\begin{tabular}[t]{@{}c@{}}{\fontsize{11}{13}\selectfont \textcolor{red}{Author Name}}\\\textit{Dept. of Computer Science \& Engg.}\\\textit{B.M.S. College of Engineering}\\Bengaluru, India\\ \textcolor{red}{email address}\end{tabular} &
+\begin{tabular}[t]{@{}c@{}}{\fontsize{11}{13}\selectfont \textcolor{red}{Author Name}}\\\textit{Dept. of Computer Science \& Engg.}\\\textit{B.M.S. College of Engineering}\\Bengaluru, India\\ \textcolor{red}{email address}\end{tabular}
+\end{tabular*}}
+
+\maketitle
+
+\begin{abstract}
+When a microservice fails, the fault spreads along service-call edges and on-call engineers must search dozens of noisy signals to find its origin. Graph-based root cause analysis (RCA) models localise faults well on the topology they were trained on, but are rarely tested on a topology they have never seen, and they stop at a ranked list rather than an investigation. We present IncidentMind, an RCA pipeline that couples (i) an inductive GraphSAGE scorer that ranks services by root-cause probability, (ii) a Proximal Policy Optimisation (PPO) policy that decides which service to investigate next under a step budget, and (iii) locally hosted LLaMA~3.2~3B agents that inspect logs, metrics and code changes and write a structured incident report. The scorer and policy are trained only on RCAEval RE1 (Online Boutique, 11 services) and evaluated without retraining on ShopMind, a 12-service e-commerce testbed we built with fault injection. On held-out RE1 incidents the scorer reaches PR@1 of 0.92 (peer z-score: 0.12). Transferred zero-shot to ShopMind it reaches PR@1 of 0.51 (random: 0.08), with 0.91 on CPU stress and 0.80 on memory pressure but only 0.08 on pod crashes, a gap we trace to the absence of error-rate signal in the training data. The learned dispatcher solves 57\% of ShopMind incidents within five steps versus 51\% for greedy dispatch (exact McNemar $p=0.031$). Given the correct target service, the agent layer names the root cause in 82\% of 100 incidents and abstains in 14\%. We also report four live end-to-end fault-injection runs, including a simultaneous dual fault, and release the testbed and pipeline.
+\end{abstract}
+
+\begin{IEEEkeywords}
+root cause analysis, microservices, graph neural networks, GraphSAGE, reinforcement learning, LLM agents, AIOps
+\end{IEEEkeywords}
+
+%=====================================================================
+\section{Introduction}
+%=====================================================================
+Cloud-native applications are built from many small services that call each other over the network. This design makes teams faster, but it makes failures harder to diagnose: a CPU-starved authentication service can show up as timeouts in a gateway, and a slow payment service can make its caller look like the problem~\cite{zhou2021fault,soldani2022survey}. Engineers must correlate metrics, logs, traces and recent changes across services before they can act.
+
+Automated RCA has moved from statistical correlation and causal inference~\cite{pham2024howfar,li2022circa} towards models that use the service dependency graph directly~\cite{yu2021microrank,lee2023eadro,zhao2024chase}. More recently, LLM-based agents have been applied to incident investigation~\cite{roy2024llmagents,chen2024rcacopilot,pei2025flowofaction,xu2025openrca}. Two practical gaps remain. First, most graph models are trained and tested on the same application, so it is unclear whether they transfer to a new topology, which is the normal situation when a team adopts a tool; recent work even questions whether graph structure helps at all~\cite{gao2025diagmlp}. Second, a ranked list of suspects is not an investigation: someone still has to decide which service to inspect, gather evidence, and write up the finding.
+
+IncidentMind addresses both. A GraphSAGE model~\cite{hamilton2017graphsage} learns an aggregation function over neighbours rather than a fixed adjacency transform, so it can score a graph it has never seen. A PPO policy~\cite{schulman2017ppo} reads the ranked scores and the investigation history and picks the next target, so a wrong first guess is not the end of the search. Specialist LLM agents then examine the chosen service and produce a report. The contributions of this paper are:
+\begin{itemize}
+    \item \textbf{A three-layer RCA pipeline} (graph scoring, learned dispatch, LLM investigation) with fixed-size state and action spaces, so the same trained models run unchanged on topologies of different size.
+    \item \textbf{A strict cross-topology evaluation}: models and feature normalisation are fitted only on RCAEval RE1~\cite{pham2025rcaeval}; ShopMind is used only for testing.
+    \item \textbf{ShopMind}, a 12-service containerised testbed with four injectable fault types, a 100-incident evaluation set with ground-truth labels, and a live inject-and-capture path.
+    \item \textbf{A per-fault failure analysis}, including a failure mode (pod crashes) that we diagnose rather than patch, and operational extensions for multi-fault detection, business-priority re-ranking and multi-instance telemetry.
+\end{itemize}
+
+%=====================================================================
+\section{Related Work}
+%=====================================================================
+\textbf{Statistical and causal RCA.} Log parsers and detectors such as Drain~\cite{he2017drain} and DeepLog~\cite{du2017deeplog} find anomalous events but do not model service topology. Causal-inference methods such as CIRCA~\cite{li2022circa} rank root causes from metric dependencies; a large benchmark study at ASE~2024 found that no causal method performs consistently well across systems and fault types~\cite{pham2024howfar}. The resulting RCAEval benchmark~\cite{pham2025rcaeval} provides the RE1 data we train on.
+
+\textbf{Graph-based fault localisation.} MicroRank~\cite{yu2021microrank} applies spectrum analysis over traces, Eadro~\cite{lee2023eadro} learns jointly from logs, metrics and traces, and CHASE~\cite{zhao2024chase} builds a causal heterogeneous graph. These models are typically trained and tested on one application. Gao et al.~\cite{gao2025diagmlp} show that a plain MLP can match GNNs on existing multimodal benchmarks, which motivates testing whether graph models add value when the topology changes. We test transfer to an unseen topology explicitly.
+
+\textbf{LLM agents for incidents.} RCACopilot~\cite{chen2024rcacopilot} and the study by Roy et al.~\cite{roy2024llmagents} show that LLMs can collect diagnostic data and suggest root causes in production settings. Flow-of-Action~\cite{pei2025flowofaction} guides a multi-agent system with standard operating procedures, and OpenRCA~\cite{xu2025openrca} finds that current LLMs still struggle to locate root causes from raw telemetry. IncidentMind uses a learned graph model to narrow the search before any LLM is called, and uses a small local model so no telemetry leaves the organisation.
+
+\textbf{Reinforcement learning in AIOps.} RL has mainly been applied to autoscaling and resource management; surveys of incident management~\cite{remil2024aiops} report little work on learning \emph{investigation order}. Our dispatcher is a small step in that direction.
+
+%=====================================================================
+\section{Problem Formulation}
+%=====================================================================
+A microservice system at time $t$ is a directed graph $G=(V,E)$, where $V$ is the set of services and $(u,v)\in E$ means $u$ calls $v$. Each service $v$ has a feature vector $\mathbf{x}_v\in\mathbb{R}^5$: CPU usage, memory usage, mean latency, error rate and 99th-percentile latency. An incident $I=(G,\{\mathbf{x}_v\},r^*)$ has one ground-truth root-cause service $r^*\in V$.
+
+\textbf{Localisation.} A scorer $f$ returns $p_v=f(G,\mathbf{X})_v$, the probability that $v=r^*$, and a ranking $\pi$ of $V$ by $p_v$. We report PR@$k=\mathbf{1}[r^*\in\pi_{1:k}]$ averaged over incidents (the top-$k$ hit rate) and MTTD, the mean rank of $r^*$ in $\pi$ (the number of services an engineer would inspect in order).
+
+\textbf{Dispatch.} Investigation is an episodic decision process. At step $t$ the state $s_t$ holds the ranked scores and the set of visited services; the action $a_t=(\text{agent},\text{slot})$ picks an agent type and a rank slot. The episode ends when the target equals $r^*$ (solved) or after a budget of $B=5$ steps. The policy $\pi_\theta(a_t\mid s_t)$ should maximise the solve rate and minimise steps.
+
+%=====================================================================
+\section{IncidentMind Architecture}
+%=====================================================================
+Fig.~\ref{fig:arch} shows the pipeline. Telemetry is captured as a snapshot, scored by GraphSAGE, passed to the PPO dispatcher, investigated by agents, and summarised by a report agent.
+
+\begin{figure}[t]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tikzpicture}[
+  box/.style={draw, rounded corners=2pt, align=center, font=\small, minimum height=1.0cm, text width=2.4cm, fill=white},
+  ag/.style={draw, rounded corners=2pt, align=center, font=\footnotesize, minimum height=0.75cm, text width=1.35cm, fill=gray!8},
+  arr/.style={-{Stealth[length=2mm]}, thick}]
+\node[box] (tel) {Telemetry snapshot\\ \footnotesize Prometheus, logs, git};
+\node[box, right=1.0cm of tel] (gnn) {GraphSAGE scorer\\ \footnotesize 5$\to$64$\to$64$\to$128};
+\node[box, right=1.3cm of gnn] (ppo) {PPO dispatcher\\ \footnotesize 24-dim state, 36 actions};
+\node[box, above=0.45cm of gnn, text width=8.2cm, fill=gray!4, minimum height=0.6cm] (ext) {\footnotesize Extensions: multi-fault flagging $\cdot$ priority re-ranking $\cdot$ multi-instance queue};
+\node[ag, below=1.1cm of ppo] (code) {Code agent};
+\node[ag, left=0.2cm of code] (met) {Metrics agent};
+\node[ag, left=0.2cm of met] (log) {Log agent};
+\node[draw, dashed, rounded corners=2pt, fit=(log)(met)(code), inner sep=4pt] (agents) {};
+\node[font=\scriptsize, below=0pt of agents] {LLaMA 3.2 3B via Ollama (local)};
+\node[box, below=1.1cm of tel] (rep) {Report agent\\ \footnotesize JSON report, EN/HI};
+\draw[arr] (tel) -- (gnn);
+\draw[arr] (gnn) -- node[above, font=\scriptsize]{ranked $p_v$} (ppo);
+\draw[arr] (ppo.south) -- node[right, font=\scriptsize]{(agent, target)} (ppo.south |- agents.north);
+\draw[arr] (agents.west) -- node[above, font=\scriptsize]{evidence} (rep.east);
+\draw[arr, dashed] (ext.south) -- (gnn.north);
+\end{tikzpicture}}
+\caption{IncidentMind pipeline. Only the scorer and dispatcher are learned; both are trained on RCAEval RE1 and applied unchanged to ShopMind.}
+\label{fig:arch}
+\end{figure}
+
+\subsection{GraphSAGE Root-Cause Scorer}
+The scorer is a three-layer GraphSAGE network~\cite{hamilton2017graphsage} with mean aggregation (widths $5\to64\to64\to128$, ReLU, dropout 0.2) followed by a linear two-class head. Edges are added in both directions so that anomaly evidence can flow from a cause to its callers and back, since the direction of propagation is unknown at inference time. Features are z-normalised with per-feature means and standard deviations fitted once on the training split and stored with the checkpoint; they are never refitted on a test incident or on ShopMind. Without this step, raw feature scales (memory in bytes, error rate below one) saturated the logits and training stalled at a loss of $\ln 2$.
+
+Training is node classification with class-weighted cross-entropy: the root-cause class is weighted by $|V|-1$ to offset having one positive node per graph. We use Adam (learning rate 0.01) for 50 epochs. The score $p_v$ is the softmax probability of the root-cause class. Because SAGE layers learn a function of a node's own features and its neighbours' mean, the same weights apply to any graph size or wiring.
+
+\subsection{Learned Dispatch with PPO}
+The observation is a fixed 24-dimensional vector: the scores of the top 12 rank slots (zero-padded) and a 12-bit visited mask in the same slot order. The action space has $3\times12=36$ discrete actions, one per (agent type, rank slot); slots beyond the graph size wrap modulo $|V|$. Defining actions over \emph{rank slots} rather than service names is what lets one policy run on both the 11-node RE1 graph and the 12-node ShopMind graph.
+
+The reward is $+1$ when the chosen service is $r^*$, $-0.1$ per step, and an extra $-0.5$ for revisiting a service; episodes end on success or after five steps. We train with Stable-Baselines3~\cite{raffin2021sb3} PPO (MLP policy and value networks $[64,64]$, rollout 2048, batch 64, 10 epochs, $\gamma=0.99$, GAE $\lambda=0.95$, clip 0.2, entropy coefficient 0.01, learning rate $3\times10^{-4}$, 20{,}480 timesteps, seed 42) on the RE1 training split only, using the trained GraphSAGE scores as state.
+
+\subsection{Investigation Agents}
+Each agent is LLaMA~3.2~3B~\cite{grattafiori2024llama3} served locally through Ollama at temperature 0, with a system prompt and a JSON output schema. The \emph{log agent} reads recent container logs of the target; the \emph{metrics agent} receives baseline-versus-failure-window averages and deltas for every service (the injected fault type is never included in any prompt); the \emph{code agent} summarises recent commits touching the target. Each returns a finding, severity, confidence and evidence list. The agents read files from disk and are agnostic to whether the data came from a replay or a live capture.
+
+\subsection{Report Agent}
+The report agent merges the evidence bundle into a structured report: root-cause service, confidence, evidence summary, suggested fix, estimated blast radius, and report text in English and Hindi. It may output \texttt{unknown} when evidence is insufficient.
+
+\subsection{Operational Extensions}
+Three lightweight additions target deployment rather than accuracy. \emph{Multi-fault flagging} lists every service whose score exceeds 0.5 instead of surfacing only the dispatch target. \emph{Priority re-ranking} computes $\text{priority}_v=p_v\cdot w_v$ with static criticality tiers ($w=1.0$ for auth, order, payment and primary database; $0.6$ for medium services; $0.3$ for search, notification and frontend); raw scores in the PPO state are left unchanged and only the order is adjusted. \emph{Multi-instance telemetry} is a small HTTP receiver that stores snapshots tagged by instance, and a global queue keys nodes by (instance, service) so that identically named services on different deployments are not confused.
+
+%=====================================================================
+\section{Experimental Setup}
+%=====================================================================
+\subsection{Datasets}
+\textbf{RCAEval RE1-OB (training domain).} RE1~\cite{pham2025rcaeval} contains 125 Online Boutique~\cite{googleob} incidents: five root-cause services (ad, cart, checkout, currency, product catalogue) $\times$ five faults (CPU, memory, disk, delay, packet loss) $\times$ five repetitions. Each incident becomes an 11-node, 15-edge graph using the published Online Boutique call graph, with features averaged over the post-injection window. We use a fixed 60/20/20 split (seed 42): 75 training, 25 validation, 25 test incidents. RE1 provides no error-rate metric, so that feature is constant zero in training.
+
+\textbf{ShopMind (unseen topology).} ShopMind is a 12-service e-commerce application we built for this study: an Nginx gateway, a web frontend, seven Node.js services (auth, user, order, payment, inventory, notification, search), PostgreSQL primary and replica, and Redis, with 16 call edges. Services export Prometheus metrics and OpenTelemetry traces to Jaeger. Each application service exposes an \texttt{/inject-fault} endpoint for four faults: \emph{CPU stress} (busy loop for 80\,ms of every 100\,ms), \emph{memory pressure} (bounded heap growth), \emph{network delay} (2\,s delay before handling), and \emph{pod crash} (\texttt{process.exit(1)} re-triggered on restart until the fault window ends). After each fault, a settle check waits until CPU $<0.15$, mean latency $<100$\,ms and error rate $<0.10$ before the next incident, to avoid spill-over between incidents. The frozen evaluation set has 100 incidents over all 28 service--fault pairs (23 CPU, 25 memory, 27 delay, 25 crash). Each incident uses the peak-anomaly snapshot of its failure window; units are aligned to RE1 conventions at export time (CPU in percent, latency in seconds, memory in bytes).
+
+\subsection{Baselines}
+For localisation we compare against a \emph{random} ranking and a training-free \emph{peer z-score} scorer that ranks services by the root-mean-square z-score of their features relative to the other services in the same snapshot. For dispatch, all methods use identical GraphSAGE scores and the same five-step budget:
+\begin{itemize}
+    \item \textbf{Baseline A (random):} uniform choice among unvisited services flagged anomalous ($p_v\ge0.5$).
+    \item \textbf{Baseline B (threshold):} first unvisited anomalous service in a per-incident shuffled arrival order, so neither score order nor node position leaks the answer.
+    \item \textbf{Baseline C (greedy):} the top-ranked service only; it has no memory, so a wrong first pick is never corrected.
+\end{itemize}
+
+\subsection{Metrics and Statistics}
+We report PR@1/3/5 and MTTD for localisation, and solve rate and mean steps (unsolved episodes counted at the budget) for dispatch. We give 95\% bootstrap confidence intervals (10{,}000 resamples) for PR@$k$, and use an exact McNemar test on paired per-incident outcomes to compare dispatchers. For the agent layer we report root-cause accuracy, abstention (\texttt{unknown}) rate and JSON validity.
+
+\subsection{Implementation}
+The pipeline uses Python~3.11, PyTorch, PyTorch Geometric~\cite{fey2019pyg} and Stable-Baselines3; ShopMind runs under Docker Compose on a single laptop. All learned numbers below come from one pair of released checkpoints; the unit-test suite checks the data contracts, dispatch baselines and cross-instance queue.
+
+%=====================================================================
+\section{Results}
+%=====================================================================
+\subsection{In-Domain Localisation (RE1 Test Split)}
+Table~\ref{tab:loc} (left columns) shows that GraphSAGE ranks the true root cause first in 23 of 25 held-out RE1 incidents (PR@1 $=0.92$, 95\% CI $[0.80,1.00]$) and within the top three in all 25 (MTTD $=1.08$). The peer z-score scorer usually places the root cause in the top three (0.72) but rarely first (0.12): on 21 of the 25 test incidents it ranks the busy entry service \emph{frontend} first, because its load deviates more from its peers than the faulty service does. Per fault, GraphSAGE reaches PR@1 $=1.00$ on CPU, memory, disk and loss, and $0.33$ on delay (3 incidents), where it still ranks the cause within the top three.
+
+\begin{table}[t]
+\centering
+\caption{Root-cause localisation. RE1: 25 held-out test incidents (11 nodes). ShopMind: all 100 incidents (12 nodes), zero-shot with RE1-fitted models and normalisation.}
+\label{tab:loc}
+\setlength{\tabcolsep}{1.6pt}
+\footnotesize
+\begin{tabular}{lcccc@{\hspace{4pt}}cccc}
+\toprule
+ & \multicolumn{4}{c}{\textbf{RE1 (in-domain)}} & \multicolumn{4}{c}{\textbf{ShopMind (unseen)}} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+Method & PR@1 & PR@3 & PR@5 & MTTD & PR@1 & PR@3 & PR@5 & MTTD \\
+\midrule
+Random         & 0.09 & 0.27 & 0.45 & 6.00 & 0.08 & 0.25 & 0.42 & 6.50 \\
+Peer z-score   & 0.12 & 0.72 & 0.80 & 3.28 & 0.18 & \textbf{0.77} & \textbf{0.78} & 3.84 \\
+GraphSAGE      & \textbf{0.92} & \textbf{1.00} & \textbf{1.00} & \textbf{1.08} & \textbf{0.51} & 0.62 & 0.70 & \textbf{3.54} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Cross-Topology Transfer (ShopMind)}
+Applied without retraining to ShopMind, which differs from RE1 in service count, wiring, implementation language and fault mechanisms, GraphSAGE achieves PR@1 $=0.51$ ($[0.41,0.61]$), six times the random rate and almost three times the z-score scorer (0.18). Fig.~\ref{fig:perfault} breaks this down by fault. Transfer is strong for faults that raise a resource metric on the faulty service itself: CPU stress (0.91) and memory pressure (0.80). It is weak for network delay (0.30) and pod crash (0.08).
+
+The two failures have different causes. \emph{Network delay} makes the \emph{caller} look worst: in ShopMind, when \emph{payment} is delayed, \emph{order} accumulates pending requests and shows latency above 1.2\,s and timeout errors, while the delayed service can report near-zero span durations because clients disconnect before it responds. A scorer that follows symptoms is pulled one hop upstream. \emph{Pod crash} leaves the crashed service with zeroed resource and latency metrics and an error rate of 1.0, while its caller (often \emph{order}) shows raised latency and errors. Error rate is constant zero throughout RE1, so the model never learned that signal, and a zeroed node looks \emph{less} anomalous than its busy neighbours; it is also indistinguishable in the other four features from uninstrumented nodes such as the gateway. Notably, the untrained z-score scorer ranks crashed services in the top three in 96\% of crash incidents, because an error rate of 1.0 next to zeroed metrics stands out against its peers even without training. This suggests that the two signals are complementary. We report this as a limitation of the training data instead of adding a hand-written crash rule, which would weaken the transfer claim.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    xbar=0pt, bar width=4pt, width=0.86\columnwidth, height=4.6cm,
+    xmin=0, xmax=1.05, xlabel={PR@1 / solve rate on ShopMind},
+    symbolic y coords={Pod crash, Network delay, Memory pressure, CPU stress},
+    ytick=data, y tick label style={font=\footnotesize},
+    x tick label style={font=\footnotesize}, xlabel style={font=\footnotesize},
+    legend style={font=\scriptsize, legend columns=3, at={(0.45,1.02)}, anchor=south, draw=none, /tikz/every even column/.append style={column sep=4pt}},
+    legend image code/.code={\draw[#1] (0cm,-0.08cm) rectangle (0.25cm,0.08cm);},
+    reverse legend=false,
+    enlarge y limits=0.18, xmajorgrids, grid style={gray!25}]
+\addplot[fill=gray!25, draw=gray!60] coordinates {(0.00,Pod crash) (0.22,Network delay) (0.24,Memory pressure) (0.26,CPU stress)};
+\addplot[fill=gray!60, draw=gray!80] coordinates {(0.08,Pod crash) (0.30,Network delay) (0.80,Memory pressure) (0.91,CPU stress)};
+\addplot[fill=black!85, draw=black] coordinates {(0.16,Pod crash) (0.33,Network delay) (0.88,Memory pressure) (0.96,CPU stress)};
+\legend{Z-score PR@1, GraphSAGE PR@1, PPO solve ($B{=}5$)}
+\end{axis}
+\end{tikzpicture}
+\caption{Per-fault zero-shot results on ShopMind ($n=23/25/27/25$ for CPU/memory/delay/crash).}
+\label{fig:perfault}
+\end{figure}
+
+\subsection{Learned Dispatch}
+Table~\ref{tab:dispatch} compares dispatchers given identical scores. On RE1 the scorer is already accurate, so all methods solve almost everything; PPO needs the fewest steps among those that solve all 25 (1.08), and greedy dispatch fails the two incidents whose root cause was ranked second.
+
+On ShopMind the differences are larger. PPO solves 57\% of incidents within five steps, compared with 51\% for greedy and 45\% for the random and threshold baselines. On paired outcomes, PPO solves six incidents that greedy misses and greedy solves none that PPO misses (exact McNemar $p=0.031$). Mean steps per incident fall from 2.96 to 2.78. The gains come from the harder faults: +0.08 on pod crash, +0.04 on network delay and +0.08 on memory pressure over greedy. Tracing the episodes shows what the policy learned: it always inspects rank~1 first and, after a miss, inspects rank~2 (all 57 solves occur at step 1 or 2). It does not explore beyond the second slot; in the remaining 43 episodes it revisits ranks~1--2 until the budget runs out, despite the revisit penalty. So its gain comes from a learned second guess, and it cannot recover root causes ranked third or lower. A richer state (e.g., score gaps or per-feature evidence from agents) is needed for deeper search. Baselines A and B are limited because on ShopMind only 0.78 services per incident cross the 0.5 threshold on average, so they often run out of candidates.
+
+\begin{table}[t]
+\centering
+\caption{Dispatch under a five-step budget with identical GraphSAGE scores. Steps: mean over all incidents, unsolved counted as 5.}
+\label{tab:dispatch}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccc}
+\toprule
+ & \multicolumn{2}{c}{\textbf{RE1 test ($n=25$)}} & \multicolumn{2}{c}{\textbf{ShopMind ($n=100$)}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Dispatcher & Solve & Steps & Solve & Steps \\
+\midrule
+A: random (anomalous)   & 1.00 & 1.12 & 0.45 & 3.27 \\
+B: threshold, arrival   & 1.00 & 1.12 & 0.45 & 3.24 \\
+C: greedy top-1         & 0.92 & 1.32 & 0.51 & 2.96 \\
+PPO (ours)              & \textbf{1.00} & \textbf{1.08} & \textbf{0.57} & \textbf{2.78} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Agent Layer}
+To isolate the LLM layer from localisation errors, we dispatched the metrics and report agents to the ground-truth service on a separate run of 100 ShopMind incidents with raw telemetry series (oracle dispatch; fault type withheld from prompts). Table~\ref{tab:agents} summarises the results. The report named the correct root cause in 82 incidents, output \texttt{unknown} in 14, and named a wrong service in 4; all 100 reports were valid JSON. Accuracy was highest on memory pressure (28/28) and lowest on pod crash (16/23). All four wrong answers involved a fault on \emph{notification-service} being attributed to \emph{auth-service}. Stated confidence was informative: it averaged 0.69 on correct reports and 0.11 on incorrect or abstained ones. This is an upper bound for the agent layer, since the end-to-end pipeline passes on scorer and dispatcher errors.
+
+\begin{table}[t]
+\centering
+\caption{Agent-layer accuracy under oracle dispatch (100 ShopMind incidents).}
+\label{tab:agents}
+\begin{tabular}{lcccc}
+\toprule
+Fault & $n$ & Correct & Unknown & Wrong \\
+\midrule
+CPU stress       & 32 & 25 (78\%)  & 7 & 0 \\
+Memory pressure  & 28 & 28 (100\%) & 0 & 0 \\
+Network delay    & 17 & 13 (76\%)  & 3 & 1 \\
+Pod crash        & 23 & 16 (70\%)  & 4 & 3 \\
+\midrule
+\textbf{All}     & 100 & \textbf{82 (82\%)} & 14 & 4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Live End-to-End Runs}
+We ran the full pipeline on live ShopMind faults: inject, capture five baseline and 15 failure snapshots at 2\,s intervals, select the peak snapshot, score, dispatch, investigate and report. Table~\ref{tab:live} lists the four runs from the final integrated build. In each, GraphSAGE ranked the injected service first, PPO dispatched to it on the first step, and the report named it with confidence 0.8. In the dual-fault run (CPU stress on \emph{order} and \emph{inventory} at the same time), both services scored 1.00 and multi-fault flagging reported both, whereas the single dispatch target alone would have surfaced only one.
+
+\begin{table}[t]
+\centering
+\caption{Live end-to-end runs on ShopMind (final build).}
+\label{tab:live}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{llccc}
+\toprule
+Fault & Injected service(s) & Rank-1 score & PPO step & Report \\
+\midrule
+CPU stress     & auth              & 1.00 & 1 & correct \\
+CPU stress     & order             & 1.00 & 1 & correct \\
+Network delay  & payment           & 1.00 & 1 & correct \\
+Dual CPU       & order + inventory & 1.00 / 1.00 & 1 & correct$^\dagger$ \\
+\bottomrule
+\multicolumn{5}{l}{\footnotesize $^\dagger$Report names \emph{order}; multi-fault flag lists both services.}
+\end{tabular}
+\end{table}
+
+Two earlier live runs illustrate the extensions and the main weakness. In a CPU-stress run on \emph{auth}, GraphSAGE gave \emph{auth} and \emph{notification} equal scores of 1.00; priority re-ranking kept \emph{auth} (high tier) first and moved \emph{notification} (low tier) down. In a live pod-crash run on \emph{auth}, the scorer instead ranked \emph{payment} first on a small CPU fluctuation (score 0.45), and the dispatcher, agents and report followed it with confidence 0.5. This matches the offline pod-crash result. On the 100-incident benchmark, priority re-ranking changed PR@1 from 0.51 to 0.48 and left PR@5 unchanged at 0.70. As intended, it reorders by business impact and does not improve accuracy.
+
+%=====================================================================
+\section{Discussion and Limitations}
+%=====================================================================
+\textbf{What transfers.} The in-domain versus cross-domain gap (0.92 vs.\ 0.51 PR@1) is large, and part of the in-domain score probably comes from RE1's fixed topology and only five root-cause services, which a model can partly memorise. The per-fault picture is more informative than the average: faults whose signature sits on the faulty node transfer almost fully, while faults whose signature appears on neighbours or in features absent from training do not. Graph structure alone does not solve cross-topology RCA. Training on sources with richer features, for example RCAEval RE2/RE3 with logs and traces, is the most direct fix.
+
+\textbf{Report quality.} Root-cause attribution was reliable when evidence was clear, but free-text parts were weaker. Some suggested fixes repeated harmless log lines (e.g., a service ``listening on a port'') as causes, one CPU-stress report mentioned pod crashes that did not occur, and the Hindi text was sometimes repetitive. These are typical of a 3B model; structured fields should be trusted over narrative text, and translation quality was not formally evaluated.
+
+\textbf{Threats to validity.} The RE1 test split has only 25 incidents, so its confidence intervals are wide. ShopMind is a controlled testbed with four fault types and one instance per service. The agent evaluation used oracle dispatch and a separately generated incident set, so it is not a direct end-to-end accuracy figure. Live runs are case studies, not a benchmark. Multi-instance support was verified over loopback; a true cross-machine run and notification hooks are future work. RE1 features are window averages while ShopMind uses peak snapshots, which is an additional distribution shift.
+
+%=====================================================================
+\section{Conclusion}
+%=====================================================================
+IncidentMind combines an inductive GraphSAGE scorer, a PPO dispatcher over rank slots, and local LLM agents into a single RCA pipeline that runs unchanged on a topology it was not trained on. Trained only on RCAEval RE1, it localises root causes on the unseen ShopMind testbed at six times the random rate, with strong transfer on resource faults and a clearly diagnosed failure on crashes caused by missing training signal. Learned dispatch recovers significantly more incidents than greedy dispatch by learning a second guess, and the agent layer turns a correct target into a correct, machine-readable report 82\% of the time. Future work includes training on multimodal sources to close the crash and delay gaps, combining learned and statistical scores, and multi-machine deployment. The code and testbed are available at \url{https://github.com/rakshithay3/incident-mind}.
+
+\section*{Acknowledgment}
+The authors thank the Department of Computer Science and Engineering, B.M.S. College of Engineering, Bengaluru, for the facilities and support provided for this work. We also thank the authors of RCAEval for releasing their benchmark data publicly, and the maintainers of PyTorch Geometric, Stable-Baselines3 and Ollama, whose open-source tools made this study possible.
+
+The authors used Claude (Anthropic), an AI assistant, to write the analysis scripts that computed the metrics in Tables~\ref{tab:loc}--\ref{tab:dispatch} and Fig.~\ref{fig:perfault} from the authors' trained models and datasets. The IncidentMind system, the ShopMind testbed, model training, the agent evaluation and the live fault-injection runs are the authors' own work. The authors reviewed and checked all AI-generated content and take full responsibility for the paper.
+
+\begin{thebibliography}{99}
+
+\bibitem{zhou2021fault}
+X.~Zhou, X.~Peng, T.~Xie, J.~Sun, C.~Ji, W.~Li, and D.~Ding, ``Fault analysis and debugging of microservice systems: Industrial survey, benchmark system, and empirical study,'' \emph{IEEE Trans. Softw. Eng.}, vol.~47, no.~2, pp.~243--260, 2021.
+
+\bibitem{soldani2022survey}
+J.~Soldani and A.~Brogi, ``Anomaly detection and failure root cause analysis in (micro)service-based cloud applications: A survey,'' \emph{ACM Comput. Surv.}, vol.~55, no.~3, 2022.
+
+\bibitem{pham2024howfar}
+L.~Pham, H.~Ha, and H.~Zhang, ``Root cause analysis for microservices based on causal inference: How far are we?'' in \emph{Proc. 39th IEEE/ACM Int. Conf. Automated Software Engineering (ASE)}, 2024.
+
+\bibitem{li2022circa}
+M.~Li, Z.~Li, K.~Yin, X.~Nie, W.~Zhang, K.~Sui, and D.~Pei, ``Causal inference-based root cause analysis for online service systems with intervention recognition,'' in \emph{Proc. 28th ACM SIGKDD Conf. Knowledge Discovery and Data Mining}, 2022.
+
+\bibitem{yu2021microrank}
+G.~Yu, P.~Chen, H.~Chen, Z.~Guan, Z.~Huang, L.~Jing, T.~Weng, X.~Sun, and X.~Li, ``MicroRank: End-to-end latency issue localization with extended spectrum analysis in microservice environments,'' in \emph{Proc. Web Conf. (WWW)}, 2021.
+
+\bibitem{lee2023eadro}
+C.~Lee, T.~Yang, Z.~Chen, Y.~Su, and M.~R.~Lyu, ``Eadro: An end-to-end troubleshooting framework for microservices on multi-source data,'' in \emph{Proc. 45th Int. Conf. Software Engineering (ICSE)}, 2023.
+
+\bibitem{zhao2024chase}
+Z.~Zhao, T.~Zhang, Z.~Shen, H.~Dong, X.~Ma, X.~Liu, and Y.~Yang, ``CHASE: A causal heterogeneous graph based framework for root cause analysis in multimodal microservice systems,'' arXiv:2406.19711, 2024.
+
+\bibitem{roy2024llmagents}
+D.~Roy, X.~Zhang, R.~Bhave, C.~Bansal, P.~Las-Casas, R.~Fonseca, and S.~Rajmohan, ``Exploring LLM-based agents for root cause analysis,'' in \emph{Companion Proc. 32nd ACM Int. Conf. Foundations of Software Engineering (FSE)}, 2024.
+
+\bibitem{chen2024rcacopilot}
+Y.~Chen, H.~Xie, M.~Ma, Y.~Kang, X.~Gao, L.~Shi, Y.~Cao, X.~Gao, H.~Fan, M.~Wen, J.~Zeng, S.~Ghosh, X.~Zhang, C.~Zhang, Q.~Lin, S.~Rajmohan, D.~Zhang, and T.~Xu, ``Automatic root cause analysis via large language models for cloud incidents,'' in \emph{Proc. 19th European Conf. Computer Systems (EuroSys)}, 2024.
+
+\bibitem{pei2025flowofaction}
+C.~Pei, Z.~Wang, F.~Liu, Z.~Li, Y.~Liu, X.~He, R.~Kang, T.~Zhang, J.~Chen, J.~Li, G.~Xie, and D.~Pei, ``Flow-of-Action: SOP enhanced LLM-based multi-agent system for root cause analysis,'' in \emph{Companion Proc. ACM Web Conf. (WWW)}, 2025.
+
+\bibitem{xu2025openrca}
+J.~Xu \emph{et al.}, ``OpenRCA: Can large language models locate the root cause of software failures?'' in \emph{Proc. Int. Conf. Learning Representations (ICLR)}, 2025.
+
+\bibitem{gao2025diagmlp}
+F.~Gao, R.~Xin, X.~Li, and Y.~Zhang, ``Are GNNs actually effective for multimodal fault diagnosis in microservice systems?'' arXiv:2501.02766, 2025.
+
+\bibitem{hamilton2017graphsage}
+W.~L.~Hamilton, R.~Ying, and J.~Leskovec, ``Inductive representation learning on large graphs,'' in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, vol.~30, 2017.
+
+\bibitem{schulman2017ppo}
+J.~Schulman, F.~Wolski, P.~Dhariwal, A.~Radford, and O.~Kavukcuoglu, ``Proximal policy optimization algorithms,'' arXiv:1707.06347, 2017.
+
+\bibitem{pham2025rcaeval}
+L.~Pham, H.~Zhang, H.~Ha, F.~Salim, and X.~Zhang, ``RCAEval: A benchmark for root cause analysis of microservice systems with telemetry data,'' in \emph{Companion Proc. ACM Web Conf. (WWW)}, 2025.
+
+\bibitem{he2017drain}
+P.~He, J.~Zhu, Z.~Zheng, and M.~R.~Lyu, ``Drain: An online log parsing approach with fixed depth tree,'' in \emph{Proc. IEEE Int. Conf. Web Services (ICWS)}, 2017.
+
+\bibitem{du2017deeplog}
+M.~Du, F.~Li, G.~Zheng, and V.~Srikumar, ``DeepLog: Anomaly detection and diagnosis from system logs through deep learning,'' in \emph{Proc. ACM SIGSAC Conf. Computer and Communications Security (CCS)}, 2017.
+
+\bibitem{remil2024aiops}
+Y.~Remil, A.~Bendimerad, R.~Mathonat, and M.~Kaytoue, ``AIOps solutions for incident management: Technical guidelines and a comprehensive literature review,'' arXiv:2404.01363, 2024.
+
+\bibitem{grattafiori2024llama3}
+A.~Grattafiori \emph{et al.}, ``The Llama 3 herd of models,'' arXiv:2407.21783, 2024.
+
+\bibitem{googleob}
+Google Cloud Platform, ``Online Boutique: Cloud-native microservices demo application,'' GitHub repository. [Online]. Available: \url{https://github.com/GoogleCloudPlatform/microservices-demo}
+
+\bibitem{raffin2021sb3}
+A.~Raffin, A.~Hill, A.~Gernhardt, M.~Ernestus, and N.~Dormann, ``Stable-Baselines3: Reliable reinforcement learning implementations,'' \emph{J. Mach. Learn. Res.}, vol.~22, no.~268, pp.~1--8, 2021.
+
+\bibitem{fey2019pyg}
+M.~Fey and J.~E.~Lenssen, ``Fast graph representation learning with PyTorch Geometric,'' in \emph{ICLR Workshop on Representation Learning on Graphs and Manifolds}, 2019.
+
+\end{thebibliography}
+
+\end{document}

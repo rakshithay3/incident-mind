@@ -1,0 +1,443 @@
+{
+ "re1_test_gs": {
+  "mem": {
+   "n": 3,
+   "pr1": 1.0,
+   "pr3": 1.0,
+   "pr5": 1.0,
+   "mttd": 1.0
+  },
+  "ALL": {
+   "n": 25,
+   "pr1": 0.92,
+   "pr3": 1.0,
+   "pr5": 1.0,
+   "mttd": 1.08
+  },
+  "delay": {
+   "n": 3,
+   "pr1": 0.3333333333333333,
+   "pr3": 1.0,
+   "pr5": 1.0,
+   "mttd": 1.6666666666666667
+  },
+  "cpu": {
+   "n": 8,
+   "pr1": 1.0,
+   "pr3": 1.0,
+   "pr5": 1.0,
+   "mttd": 1.0
+  },
+  "disk": {
+   "n": 7,
+   "pr1": 1.0,
+   "pr3": 1.0,
+   "pr5": 1.0,
+   "mttd": 1.0
+  },
+  "loss": {
+   "n": 4,
+   "pr1": 1.0,
+   "pr3": 1.0,
+   "pr5": 1.0,
+   "mttd": 1.0
+  }
+ },
+ "re1_test_z": {
+  "mem": {
+   "n": 3,
+   "pr1": 1.0,
+   "pr3": 1.0,
+   "pr5": 1.0,
+   "mttd": 1.0
+  },
+  "ALL": {
+   "n": 25,
+   "pr1": 0.12,
+   "pr3": 0.72,
+   "pr5": 0.8,
+   "mttd": 3.28
+  },
+  "delay": {
+   "n": 3,
+   "pr1": 0.0,
+   "pr3": 0.0,
+   "pr5": 0.3333333333333333,
+   "mttd": 7.0
+  },
+  "cpu": {
+   "n": 8,
+   "pr1": 0.0,
+   "pr3": 1.0,
+   "pr5": 1.0,
+   "mttd": 2.0
+  },
+  "disk": {
+   "n": 7,
+   "pr1": 0.0,
+   "pr3": 0.8571428571428571,
+   "pr5": 1.0,
+   "mttd": 2.2857142857142856
+  },
+  "loss": {
+   "n": 4,
+   "pr1": 0.0,
+   "pr3": 0.25,
+   "pr5": 0.25,
+   "mttd": 6.5
+  }
+ },
+ "re1_all_z": {
+  "cpu": {
+   "n": 25,
+   "pr1": 0.0,
+   "pr3": 1.0,
+   "pr5": 1.0,
+   "mttd": 2.0
+  },
+  "ALL": {
+   "n": 125,
+   "pr1": 0.24,
+   "pr3": 0.664,
+   "pr5": 0.76,
+   "mttd": 3.512
+  },
+  "delay": {
+   "n": 25,
+   "pr1": 0.2,
+   "pr3": 0.24,
+   "pr5": 0.52,
+   "mttd": 5.4
+  },
+  "disk": {
+   "n": 25,
+   "pr1": 0.0,
+   "pr3": 0.88,
+   "pr5": 1.0,
+   "mttd": 2.36
+  },
+  "loss": {
+   "n": 25,
+   "pr1": 0.0,
+   "pr3": 0.2,
+   "pr5": 0.28,
+   "mttd": 6.8
+  },
+  "mem": {
+   "n": 25,
+   "pr1": 1.0,
+   "pr3": 1.0,
+   "pr5": 1.0,
+   "mttd": 1.0
+  }
+ },
+ "sm_gs": {
+  "memory_pressure": {
+   "n": 25,
+   "pr1": 0.8,
+   "pr3": 0.88,
+   "pr5": 0.92,
+   "mttd": 1.64
+  },
+  "ALL": {
+   "n": 100,
+   "pr1": 0.51,
+   "pr3": 0.62,
+   "pr5": 0.7,
+   "mttd": 3.54
+  },
+  "pod_crash": {
+   "n": 25,
+   "pr1": 0.08,
+   "pr3": 0.28,
+   "pr5": 0.44,
+   "mttd": 5.92
+  },
+  "network_delay": {
+   "n": 27,
+   "pr1": 0.2962962962962963,
+   "pr3": 0.4074074074074074,
+   "pr5": 0.5185185185185185,
+   "mttd": 5.0
+  },
+  "cpu_stress": {
+   "n": 23,
+   "pr1": 0.9130434782608695,
+   "pr3": 0.9565217391304348,
+   "pr5": 0.9565217391304348,
+   "mttd": 1.3043478260869565
+  }
+ },
+ "sm_z": {
+  "memory_pressure": {
+   "n": 25,
+   "pr1": 0.24,
+   "pr3": 0.8,
+   "pr5": 0.8,
+   "mttd": 3.6
+  },
+  "ALL": {
+   "n": 100,
+   "pr1": 0.18,
+   "pr3": 0.77,
+   "pr5": 0.78,
+   "mttd": 3.84
+  },
+  "pod_crash": {
+   "n": 25,
+   "pr1": 0.0,
+   "pr3": 0.96,
+   "pr5": 1.0,
+   "mttd": 2.4
+  },
+  "network_delay": {
+   "n": 27,
+   "pr1": 0.2222222222222222,
+   "pr3": 0.4074074074074074,
+   "pr5": 0.4074074074074074,
+   "mttd": 6.888888888888889
+  },
+  "cpu_stress": {
+   "n": 23,
+   "pr1": 0.2608695652173913,
+   "pr3": 0.9565217391304348,
+   "pr5": 0.9565217391304348,
+   "mttd": 2.0869565217391304
+  }
+ },
+ "re1_dispatch": {
+  "PPO": {
+   "solve": 1.0,
+   "steps_solved": 1.08,
+   "steps_all": 1.08
+  },
+  "A": {
+   "solve": 1.0,
+   "steps_solved": 1.12,
+   "steps_all": 1.12
+  },
+  "B": {
+   "solve": 1.0,
+   "steps_solved": 1.12,
+   "steps_all": 1.12
+  },
+  "C": {
+   "solve": 0.92,
+   "steps_solved": 1.0,
+   "steps_all": 1.32
+  }
+ },
+ "re1_dispatch_pf": {
+  "mem": {
+   "PPO": 1.0,
+   "A": 1.0,
+   "B": 1.0,
+   "C": 1.0
+  },
+  "delay": {
+   "PPO": 1.0,
+   "A": 1.0,
+   "B": 1.0,
+   "C": 0.3333333333333333
+  },
+  "cpu": {
+   "PPO": 1.0,
+   "A": 1.0,
+   "B": 1.0,
+   "C": 1.0
+  },
+  "disk": {
+   "PPO": 1.0,
+   "A": 1.0,
+   "B": 1.0,
+   "C": 1.0
+  },
+  "loss": {
+   "PPO": 1.0,
+   "A": 1.0,
+   "B": 1.0,
+   "C": 1.0
+  }
+ },
+ "re1_mean_anom": 1.24,
+ "sm_dispatch": {
+  "PPO": {
+   "solve": 0.57,
+   "steps_solved": 1.105263157894737,
+   "steps_all": 2.78
+  },
+  "A": {
+   "solve": 0.45,
+   "steps_solved": 1.1555555555555554,
+   "steps_all": 3.27
+  },
+  "B": {
+   "solve": 0.45,
+   "steps_solved": 1.0888888888888888,
+   "steps_all": 3.24
+  },
+  "C": {
+   "solve": 0.51,
+   "steps_solved": 1.0,
+   "steps_all": 2.96
+  }
+ },
+ "sm_dispatch_pf": {
+  "memory_pressure": {
+   "PPO": 0.88,
+   "A": 0.8,
+   "B": 0.8,
+   "C": 0.8
+  },
+  "pod_crash": {
+   "PPO": 0.16,
+   "A": 0.0,
+   "B": 0.0,
+   "C": 0.08
+  },
+  "network_delay": {
+   "PPO": 0.3333333333333333,
+   "A": 0.1111111111111111,
+   "B": 0.1111111111111111,
+   "C": 0.2962962962962963
+  },
+  "cpu_stress": {
+   "PPO": 0.9565217391304348,
+   "A": 0.9565217391304348,
+   "B": 0.9565217391304348,
+   "C": 0.9130434782608695
+  }
+ },
+ "sm_mean_anom": 0.78,
+ "sm_mcnemar_ppo_vs_c": {
+  "ppo_only": 6,
+  "c_only": 0
+ },
+ "sm_mcnemar_p": 0.03125,
+ "re1_split": {
+  "n": 125,
+  "test": 25,
+  "test_faults": {
+   "mem": 3,
+   "cpu": 8,
+   "disk": 7,
+   "loss": 4,
+   "delay": 3
+  }
+ },
+ "re1_nodes": [
+  11
+ ],
+ "re1_edges": [
+  15
+ ],
+ "sm_nodes": [
+  "frontend",
+  "api-gateway",
+  "auth-service",
+  "user-service",
+  "order-service",
+  "payment-service",
+  "inventory-service",
+  "notification-service",
+  "search-service",
+  "cache",
+  "postgres-primary",
+  "postgres-replica"
+ ],
+ "sm_edges": [
+  [
+   "frontend",
+   "api-gateway"
+  ],
+  [
+   "api-gateway",
+   "auth-service"
+  ],
+  [
+   "api-gateway",
+   "user-service"
+  ],
+  [
+   "api-gateway",
+   "order-service"
+  ],
+  [
+   "api-gateway",
+   "search-service"
+  ],
+  [
+   "order-service",
+   "payment-service"
+  ],
+  [
+   "order-service",
+   "inventory-service"
+  ],
+  [
+   "order-service",
+   "notification-service"
+  ],
+  [
+   "auth-service",
+   "postgres-primary"
+  ],
+  [
+   "user-service",
+   "postgres-primary"
+  ],
+  [
+   "order-service",
+   "postgres-primary"
+  ],
+  [
+   "payment-service",
+   "postgres-primary"
+  ],
+  [
+   "inventory-service",
+   "postgres-primary"
+  ],
+  [
+   "search-service",
+   "postgres-replica"
+  ],
+  [
+   "auth-service",
+   "cache"
+  ],
+  [
+   "postgres-primary",
+   "postgres-replica"
+  ]
+ ],
+ "sm_faults": {
+  "network_delay": 27,
+  "pod_crash": 25,
+  "memory_pressure": 25,
+  "cpu_stress": 23
+ },
+ "stats": {
+  "means": [
+   8.074226995214357,
+   46157870.93607844,
+   0.29966861381664667,
+   0.0,
+   0.43309829633768127
+  ],
+  "stds": [
+   17.3918760637278,
+   93482390.92978387,
+   0.8395507496709351,
+   1.0,
+   1.1363013795291708
+  ],
+  "feats": [
+   "cpu",
+   "memory",
+   "latency",
+   "error_rate",
+   "p99_latency"
+  ]
+ }
+}
