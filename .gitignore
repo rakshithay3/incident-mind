@@ -48,3 +48,4 @@ dashboard/public/multiInstanceResult.json
 *.sw?
 .DS_Store
 Thumbs.db
+!shopmind_raw_incidents.zip
