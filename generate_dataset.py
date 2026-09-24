@@ -59,6 +59,14 @@ def run_incident(incident_id, services_config, service_name, fault_type):
         baseline_snapshots.append({"timestamp": time.time(), "nodes": nodes, "edges": edges})
         time.sleep(1)
         
+    # 2.5 Refuse to record an incident with no trace data: if Jaeger has
+    # died, every latency/error reads 0 and the incident is silently useless.
+    if not any((n.get("mean_latency_ms") or 0) > 0 for snap in baseline_snapshots for n in snap["nodes"]):
+        load_proc.terminate()
+        print("ERROR: Jaeger returned no traces during the baseline window.")
+        print("Fix: docker compose up -d jaeger   (then re-run; finished incidents are kept)")
+        sys.exit(1)
+
     # 3. Inject fault
     cfg = services_config[service_name]
     inject_url = f"http://{cfg['host']}:{cfg['port']}/inject-fault"

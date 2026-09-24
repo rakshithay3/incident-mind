@@ -222,6 +222,11 @@ services:
     container_name: shopmind-jaeger
     mem_limit: 384m
     mem_reservation: 192m
+    restart: unless-stopped
+    environment:
+      # in-memory storage is unbounded by default; without a cap Jaeger
+      # grows until the 384m limit kills it (seen ~75 incidents into a run)
+      - MEMORY_MAX_TRACES=20000
     ports:
       - "16686:16686"
       - "4318:4318" # OTLP HTTP receiver
