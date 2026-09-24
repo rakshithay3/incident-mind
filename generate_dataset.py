@@ -1,4 +1,5 @@
 import urllib.request
+import urllib.error
 import json
 import time
 import random
@@ -238,6 +239,43 @@ def wait_for_services_to_settle(services_config, timeout_sec=20):
     print(f"Warning: Settle check timed out after {timeout_sec}s. Some services might not be fully healthy.")
     return False
 
+def _status(url, method="GET", data=None):
+    req = urllib.request.Request(url, method=method)
+    body = None
+    if data is not None:
+        req.add_header("Content-Type", "application/json")
+        body = json.dumps(data).encode("utf-8")
+    try:
+        with urllib.request.urlopen(req, data=body, timeout=5) as res:
+            return res.status
+    except urllib.error.HTTPError as e:
+        return e.code
+    except Exception:
+        return 0
+
+
+def check_gateway_routing(gateway="http://localhost:80"):
+    """Fail fast if user traffic can't reach the services. After app
+    containers are recreated, nginx keeps their OLD IPs and every request
+    through the gateway fails -- the run then records only health/metrics
+    spans (~1 ms latency, no error signal, network_delay invisible)."""
+    checks = (
+        ("/api/search?q=Sony", "GET", None),
+        ("/api/auth/login", "POST", {"username": "admin", "password": "admin"}),
+        ("/api/user/1", "GET", None),
+    )
+    bad = []
+    for path, method, data in checks:
+        status = _status(gateway + path, method, data)
+        if status == 0 or status >= 500:
+            bad.append(f"{path} -> {status or 'no response'}")
+    if bad:
+        print("Gateway is not routing to the services: " + "; ".join(bad))
+        print("Fix: docker compose restart api-gateway frontend   (then re-run)")
+        sys.exit(1)
+    print("Gateway routing OK.")
+
+
 def main():
     parser = argparse.ArgumentParser(description="ShopMind Incident Dataset Generator")
     parser.add_argument("--count", type=int, default=5, help="Number of synthetic incidents to run")
@@ -265,6 +303,7 @@ def main():
         sys.exit(1)
         
     app_services = [name for name, cfg in services_config.items() if cfg.get("role") == "app"]
+    check_gateway_routing()
     
     print(f"Preparing to execute {args.count} synthetic incidents...")
     if not os.path.exists(DATASET_DIR):
