@@ -19,6 +19,7 @@ ShopMind telemetry --> GraphSAGE anomaly scores --> priority weighting --> PPO d
 | `services/`, `docker-compose.yml`, `export_metrics.py`, `package_evaluation.py`, `demo_replay_auth_cpu/` | ShopMind 12-service testbed, fault injection, telemetry export |
 | `dashboard/` | React + Vite console |
 | `paper/` | Paper draft and the evaluation scripts/results it cites |
+| `shopmind_raw_incidents.zip`, `shopmind_evaluation_dataset_labelfree.zip` | ShopMind evaluation data (raw telemetry + label-free compiled set); see `docs/rerun_after_leakage_fix.md` |
 
 Component READMEs: [GNN + PPO](docs/README_p1.md) · [Agents](docs/README_agents.md) · [ShopMind](docs/README_shopmind.md) · Data contracts: [GNN input/output](docs/data_contract.md), [ShopMind exporter](docs/data_contract_shopmind.md) · [Demo runbook](docs/demo_runbook.md)
 

@@ -98,41 +98,35 @@ if `data/RE1/RE1-OB` already exists.
 
 ShopMind (Archie's 12-service Docker testbed) is a held-out generalization
 check only -- it is never used to fit `FeatureStats` or retrain GraphSAGE.
-The evaluation dataset (`shopmind_evaluation_dataset.zip`) is packaged on
-`archie/rakshithay3/incident-mind` and pulled locally, not committed here.
+
+**Use the label-free set.** Since Sep 2026 the evaluation data lives in this
+repo:
+
+- `shopmind_raw_incidents.zip` -- raw `telemetry_series.json` for all 100
+  incidents (re-collected 24 Sep 2026 with the fixed injector, GC-enabled
+  services, 10 s Jaeger window and capped Jaeger).
+- `shopmind_evaluation_dataset_labelfree.zip` -- the same incidents compiled
+  by `shopmind_snapshot.py`, which never reads the ground-truth label.
+- `shopmind_evaluation_dataset.zip` is the OLD set (Sep 6). Its snapshots
+  were chosen and crash-encoded using the injected target, so don't report
+  numbers from it; it is kept only for before/after comparison.
 
 ```bash
-# 1. Pull and unzip the latest packaged ShopMind incidents
-git fetch origin archie/rakshithay3/incident-mind
-git show "origin/archie/rakshithay3/incident-mind:shopmind_evaluation_dataset.zip" \
-    > /tmp/shopmind_evaluation_dataset.zip
-unzip -o /tmp/shopmind_evaluation_dataset.zip -d ~/Desktop/shopmind_evaluation_dataset
+# 1. Unzip the label-free compiled set (or rebuild it from the raw zip:
+#    unzip shopmind_raw_incidents.zip && python3 package_evaluation.py)
+mkdir -p ../sm_labelfree
+unzip -o shopmind_evaluation_dataset_labelfree.zip -d ../sm_labelfree
 
-# 2. Sanity-check that ShopMind's raw feature scales still match RE1's after
-#    z-normalization with the RE1-fitted FeatureStats. Any row flagged
-#    "FAR FROM N(0,1)" means the GraphSAGE checkpoint is seeing
-#    out-of-distribution inputs -- fix the exporter before trusting any
-#    downstream number.
+# 2. Sanity-check feature scales against the RE1-fitted FeatureStats.
 python3 scripts/diagnose_feature_scale.py \
     --re1-dataset data/rcaeval_re1 \
-    --shopmind-dataset ~/Desktop/shopmind_evaluation_dataset \
+    --shopmind-dataset ../sm_labelfree \
     --graphsage-model models/graphsage.pt
 
-# 3. Run the full ShopMind evaluation (PPO vs Baseline C solve rate)
-python3 scripts/evaluate_shopmind.py \
-    --dataset ~/Desktop/shopmind_evaluation_dataset \
-    --model models/ppo_dispatch.zip \
-    --graphsage-model models/graphsage.pt
-
-# 4. Break solve rate down by hop-distance between the scorer's top-ranked
-#    node and the true root cause. This separates a genuine cross-topology /
-#    cascading-failure generalization limit (solve rate high at hop=0,
-#    dropping as hop-distance grows) from a lingering data/scale artifact
-#    (solve rate low even at hop=0).
-python3 scripts/diagnose_shopmind_failures.py \
-    --dataset ~/Desktop/shopmind_evaluation_dataset \
-    --model models/ppo_dispatch.zip \
-    --graphsage-model models/graphsage.pt
+# 3. Paper numbers: localisation, edge ablation, dispatch (A/B/C/D, PPO,
+#    PPO+mask) with McNemar tests, then bootstrap CIs and random baselines.
+PYTHONPATH=. python3 paper/full_eval.py --shopmind-dataset ../sm_labelfree > paper/full_eval_labelfree.json
+PYTHONPATH=. python3 paper/extra_eval.py ../sm_labelfree > paper/extra_eval_labelfree.json
 ```
 
 **Known data-contract gotchas (fixed in `archie/rakshithay3/incident-mind`
