@@ -6,6 +6,8 @@ captures can be collected alongside this machine's own.
 """
 
 import json
+import os
+import re
 import sys
 import threading
 from datetime import datetime, timezone
@@ -13,7 +15,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 RECEIVED_DIR = Path("output/multi_instance")
-RECEIVED_DIR.mkdir(parents=True, exist_ok=True)
+MAX_BODY_BYTES = 5 * 1024 * 1024
+# instance_id becomes a directory name, so only allow a safe charset
+# (no "/", "..", etc.) -- otherwise a POST could write outside RECEIVED_DIR.
+INSTANCE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
+# Optional shared secret: if IM_RECEIVER_TOKEN is set, POSTs must send it in
+# the X-IM-Token header. Leave unset for loopback-only testing.
+RECEIVER_TOKEN = os.environ.get("IM_RECEIVER_TOKEN") or None
 
 _lock = threading.Lock()
 _latest_by_instance = {}
@@ -29,12 +37,21 @@ class TelemetryReceiverHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
-        print(f"[conn] from {self.client_address}")  # TEMP: cross-machine test tracing, remove after
         if self.path != "/telemetry":
             self._send_json(404, {"error": "not found"})
             return
+        if RECEIVER_TOKEN is not None and self.headers.get("X-IM-Token") != RECEIVER_TOKEN:
+            self._send_json(401, {"error": "missing or wrong X-IM-Token"})
+            return
 
-        length = int(self.headers.get("Content-Length", 0))
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            self._send_json(400, {"error": "bad Content-Length"})
+            return
+        if length <= 0 or length > MAX_BODY_BYTES:
+            self._send_json(413, {"error": f"body must be 1..{MAX_BODY_BYTES} bytes"})
+            return
         raw_body = self.rfile.read(length)
 
         try:
@@ -43,9 +60,9 @@ class TelemetryReceiverHandler(BaseHTTPRequestHandler):
             self._send_json(400, {"error": "invalid JSON"})
             return
 
-        instance_id = payload.get("instance_id")
-        if not instance_id:
-            self._send_json(400, {"error": "missing instance_id"})
+        instance_id = payload.get("instance_id") if isinstance(payload, dict) else None
+        if not isinstance(instance_id, str) or not INSTANCE_ID_RE.match(instance_id):
+            self._send_json(400, {"error": "missing or invalid instance_id (letters, digits, _ . - ; max 64)"})
             return
 
         received_at = datetime.now(timezone.utc).isoformat()
@@ -75,6 +92,8 @@ class TelemetryReceiverHandler(BaseHTTPRequestHandler):
 
 
 def run(port=5001):
+    if RECEIVER_TOKEN is None:
+        print("NOTE: IM_RECEIVER_TOKEN not set -- any machine on the network can POST telemetry.")
     server = ThreadingHTTPServer(("0.0.0.0", port), TelemetryReceiverHandler)
     print(f"Multi-instance telemetry receiver listening on 0.0.0.0:{port}")
     print("  POST /telemetry  (JSON body must include instance_id)")

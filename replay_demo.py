@@ -151,8 +151,11 @@ def main() -> None:
 
     print("[3/6] Scoring with GraphSAGE + dispatching with PPO...")
     encoder, stats = load_checkpoint(args.graphsage_model)
-    scorer = GraphSAGEScorer(encoder, stats)
-    scorer = PriorityWeightedScorer(scorer)
+    base_scorer = GraphSAGEScorer(encoder, stats)
+    # Accuracy metrics come from the raw GraphSAGE ranking (what the paper
+    # reports); priority re-ranking is for the dispatch order only.
+    raw_ranked = sorted(base_scorer.score_graph(incident), key=lambda s: s.rank)
+    scorer = PriorityWeightedScorer(base_scorer)
     ranked = sorted(scorer.score_graph(incident), key=lambda s: s.rank)
     print("  Ranking:")
     for s in ranked[:5]:
@@ -233,7 +236,10 @@ def main() -> None:
         "fault_type": telemetry["fault_type"],
         "injected_target": telemetry["target_service"],
         "true_root_cause": telemetry["target_service"],
-        "fault_injection_state": "resolved",
+        # Replays a finished capture, so the injected fault itself is over;
+        # only report "active" if the post-run recovery check says the site
+        # never returned to baseline.
+        "fault_injection_state": "active" if (recovery is not None and not recovery.get("recovered")) else "resolved",
         "nodes": [
             {"service_id": s.service_id, "anomaly_score": s.anomaly_score, "status": s.status, "rank": s.rank}
             for s in ranked
@@ -252,9 +258,10 @@ def main() -> None:
         "recovery": recovery,
         "notifications": notifications,
         "metrics": {
-            "pr_at_1": 1.0 if ranked[0].service_id == telemetry["target_service"] else 0.0,
-            "pr_at_3": 1.0 if telemetry["target_service"] in {s.service_id for s in ranked[:3]} else 0.0,
-            "pr_at_5": 1.0 if telemetry["target_service"] in {s.service_id for s in ranked[:5]} else 0.0,
+            "pr_at_1": 1.0 if raw_ranked[0].service_id == telemetry["target_service"] else 0.0,
+            "pr_at_3": 1.0 if telemetry["target_service"] in {s.service_id for s in raw_ranked[:3]} else 0.0,
+            "pr_at_5": 1.0 if telemetry["target_service"] in {s.service_id for s in raw_ranked[:5]} else 0.0,
+            "ranking": "graphsage_raw",
         },
     }
     with open(args.output, "w") as f:

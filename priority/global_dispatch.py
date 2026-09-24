@@ -13,6 +13,7 @@ PPODispatcher already uses.
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Iterator, Optional, Set
 
 from incidentmind_p1.contracts import DispatchDecision
@@ -34,9 +35,19 @@ class GlobalPPODispatcher:
 
     def dispatch_next(self, step: int = 1) -> Optional[DispatchDecision]:
         ranked = self.queue.ranked_snapshot()
+        # The policy only sees MAX_SERVICES (12) rank slots, so with more
+        # nodes than that across instances anything ranked 13th or lower was
+        # unreachable. Hand it only the not-yet-dispatched nodes, re-ranked
+        # 1..N, so the 12-slot window slides down the global list.
+        ranked = [
+            dataclasses.replace(node, rank=new_rank)
+            for new_rank, node in enumerate(
+                (n for n in ranked if (n.instance_id, n.service_id) not in self._visited), start=1
+            )
+        ]
         if not ranked:
             return None
-        decision = self._dispatcher.choose(ranked, visited=self._visited, step=step)
+        decision = self._dispatcher.choose(ranked, visited=set(), step=step)
         self._visited.add((decision.action.instance_id, decision.action.target_service))
         return decision
 

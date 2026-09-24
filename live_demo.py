@@ -53,24 +53,14 @@ from incidentmind_p1.dispatch import PPODispatcher
 from incidentmind_p1.gnn_scorer import GraphSAGEScorer
 from incidentmind_p1.training import load_checkpoint
 
-CPU_RATIO_TO_PERCENT = 100.0
-MS_TO_SECONDS = 1.0 / 1000.0
-
-SERVICE_MEM_LIMIT_BYTES = {
-    "frontend": 128 * 1024 * 1024,
-    "api-gateway": 128 * 1024 * 1024,
-    "auth-service": 384 * 1024 * 1024,
-    "user-service": 384 * 1024 * 1024,
-    "order-service": 384 * 1024 * 1024,
-    "payment-service": 384 * 1024 * 1024,
-    "inventory-service": 384 * 1024 * 1024,
-    "notification-service": 384 * 1024 * 1024,
-    "search-service": 384 * 1024 * 1024,
-    "cache": 192 * 1024 * 1024,
-    "postgres-primary": 512 * 1024 * 1024,
-    "postgres-replica": 512 * 1024 * 1024,
-}
-DEFAULT_MEM_LIMIT_BYTES = 384 * 1024 * 1024
+# Units and memory limits live in shopmind_snapshot.py, shared with the
+# benchmark compiler and replay_demo.py (this file used to carry a copy).
+from shopmind_snapshot import (  # noqa: E402,F401
+    CPU_RATIO_TO_PERCENT,
+    DEFAULT_MEM_LIMIT_BYTES,
+    MS_TO_SECONDS,
+    SERVICE_MEM_LIMIT_BYTES,
+)
 
 STATIC_EDGES = [
     ("frontend", "api-gateway"),

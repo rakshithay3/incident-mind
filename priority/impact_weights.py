@@ -11,7 +11,9 @@ weighted order. The GraphSAGE anomaly signal remains dominant; impact
 weight breaks ties and nudges ranking toward business-critical services.
 """
 
-from incidentmind_p1.contracts import NodeScore
+import dataclasses
+
+from incidentmind_p1.contracts import NodeScore  # noqa: F401  (re-exported type)
 
 TIER_WEIGHTS = {
     "high": 1.0,
@@ -66,11 +68,7 @@ class PriorityWeightedScorer:
 
         result = []
         for new_rank, (priority_score, s) in enumerate(weighted, start=1):
-            result.append(NodeScore(
-                service_id=s.service_id,
-                anomaly_score=s.anomaly_score,
-                embedding_dim=s.embedding_dim,
-                status=s.status,
-                rank=new_rank,
-            ))
+            # dataclasses.replace keeps every other field (instance_id in
+            # particular) -- rebuilding NodeScore by hand used to drop it.
+            result.append(dataclasses.replace(s, rank=new_rank))
         return result

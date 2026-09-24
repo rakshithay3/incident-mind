@@ -113,7 +113,7 @@ def peek_schema(n: int = 1) -> None:
 
 def parse_root_cause(case_dir: Path) -> tuple[str | None, str | None]:
     combo_name = case_dir.parent.name  # e.g. "currencyservice_mem"
-    service = next((s for s in KNOWN_SERVICES if s in combo_name), None)
+    service = next((s for s in sorted(KNOWN_SERVICES) if s in combo_name), None)
     fault = next((f for f in FAULT_TYPES if f"_{f}" in combo_name or combo_name.endswith(f)), None)
     return service, fault
 
@@ -127,6 +127,8 @@ def extract_service_snapshot(df, service: str) -> dict:
     lat_col = f"{service}_latency"  # read_data() already renamed _latency-90 -> _latency
     if lat_col in df.columns:
         features["latency"] = float(df[lat_col].mean())
+        # NOTE: RCAEval's latency series is already a per-interval p90, so this
+        # is the 99th percentile over time of p90 latency, not a request p99.
         features["p99_latency"] = float(df[lat_col].quantile(0.99))
     return features
 
@@ -153,7 +155,7 @@ def convert_case(case_dir: Path) -> dict | None:
     nodes = [
         {"service_id": svc, "features": extract_service_snapshot(df, svc),
          "label": "root_cause" if svc == root_cause else None}
-        for svc in KNOWN_SERVICES
+        for svc in sorted(KNOWN_SERVICES)  # sorted: set order varies with PYTHONHASHSEED
     ]
     edges = [{"source": s, "target": t} for s, t in ONLINE_BOUTIQUE_EDGES]
     incident_id = f"{case_dir.parent.name}_{case_dir.name}"

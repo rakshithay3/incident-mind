@@ -11,6 +11,15 @@ from schemas.contracts import DispatchAction
 SUPPORTED_AGENTS = {"log", "metrics", "code"}
 
 
+def _tag(finding, source):
+    """Record where an agent's evidence came from. Without a log/telemetry
+    path the agents fall back to sample_data/, and that must not be mistaken
+    for evidence about the incident being investigated."""
+    if isinstance(finding, dict):
+        finding["evidence_source"] = source
+    return finding
+
+
 def validate_action(action: DispatchAction):
     """
     Validate a DispatchAction before sending it to an agent.
@@ -63,7 +72,8 @@ def dispatch(
         # Pass log_path through so ShopMind incident replay actually
         # reaches the agent instead of silently falling back to
         # sample_data/logs.txt every time.
-        return investigate_logs(action, log_path=log_path)
+        return _tag(investigate_logs(action, log_path=log_path),
+                    "incident_logs" if log_path else "sample_data")
 
     # ---------------------------------------------------------
     # METRICS AGENT
@@ -72,17 +82,16 @@ def dispatch(
         # Pass telemetry_path through so ShopMind incident replay
         # actually reaches the agent instead of silently falling back
         # to sample_data/metrics.json every time.
-        return investigate_metrics(action, telemetry_path=telemetry_path)
+        return _tag(investigate_metrics(action, telemetry_path=telemetry_path),
+                    "incident_telemetry" if telemetry_path else "sample_data")
 
     # ---------------------------------------------------------
     # CODE AGENT
     # ---------------------------------------------------------
     elif agent_type == "code":
         # Code Agent supports an optional repo_path.
-        return investigate_code(
-            action,
-            repo_path=code_path,
-        )
+        return _tag(investigate_code(action, repo_path=code_path),
+                    "given_repo" if code_path else "default_repo")
 
     raise ValueError(
         f"Unsupported agent type: {agent_type}"
@@ -166,6 +175,16 @@ def run_investigation(
         evidence_bundle,
         incident_id=incident_id,
     )
+    sources = {
+        f.get("agent_type"): f.get("evidence_source")
+        for f in evidence_bundle["findings"]
+        if isinstance(f, dict)
+    }
+    report["evidence_sources"] = sources
+    report["uses_sample_data"] = any(v == "sample_data" for v in sources.values())
+    if report["uses_sample_data"]:
+        print("WARNING: part of this report is based on sample_data/, not on this incident: "
+              + ", ".join(k for k, v in sources.items() if v == "sample_data"))
 
     # ---------------------------------------------------------
     # 3. Save structured RCA report

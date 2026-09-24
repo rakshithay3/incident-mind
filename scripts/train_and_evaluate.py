@@ -56,6 +56,12 @@ def main() -> None:
     print(summarize_dataset(incidents))
 
     random.seed(args.seed)
+    # Seed torch/numpy too: previously only the split was seeded, so the
+    # trained GraphSAGE (and its PR@k) changed from run to run.
+    import numpy as np
+    import torch
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
     shuffled = incidents[:]
     random.shuffle(shuffled)
     n = len(shuffled)

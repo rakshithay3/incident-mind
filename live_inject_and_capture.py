@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import socket
 import subprocess
 import time
@@ -52,9 +53,11 @@ LOG_TAIL_LINES = 500
 
 def post_json(url: str, payload: dict) -> dict:
     data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url, data=data, headers={"Content-Type": "application/json"}, method="POST"
-    )
+    headers = {"Content-Type": "application/json"}
+    token = os.environ.get("IM_RECEIVER_TOKEN")
+    if token:  # multi_instance_receiver.py checks this when it is configured
+        headers["X-IM-Token"] = token
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     with urllib.request.urlopen(req, timeout=5) as resp:
         return json.loads(resp.read().decode("utf-8"))
 

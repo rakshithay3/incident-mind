@@ -8,6 +8,7 @@ cross-instance queue.
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 import requests
@@ -29,7 +30,9 @@ def main():
 
     telemetry["instance_id"] = args.instance_id
 
-    resp = requests.post(args.receiver_url, json=telemetry)
+    token = os.environ.get("IM_RECEIVER_TOKEN")
+    headers = {"X-IM-Token": token} if token else {}
+    resp = requests.post(args.receiver_url, json=telemetry, headers=headers)
     resp.raise_for_status()
     print(f"Posted {args.incident_dir} as instance_id={args.instance_id}")
     print(resp.json())
