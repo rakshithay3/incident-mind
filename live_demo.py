@@ -97,27 +97,21 @@ def telemetry_to_incident_graph(nodes_raw: list, fault_type: str, target_service
     applying the same unit conversion as package_evaluation.py's
     compile_incident() so live scoring matches what the model was
     evaluated on."""
+    # Label-free, shared with the benchmark (shopmind_snapshot.encode_node):
+    # any app service whose /metrics scrape failed (cpu_pct None) is encoded
+    # as crashed -- never conditioned on target_service or fault_type. With a
+    # single live snapshot there is no run to check, so one failed scrape
+    # counts as down here.
+    from shopmind_snapshot import encode_node
+
+    down = {n["service_id"] for n in nodes_raw if n.get("cpu_pct") is None}
     service_nodes = []
     for n in nodes_raw:
-        srv_id = n["service_id"]
-        cpu_pct = n.get("cpu_pct")
-        mem_pct = n.get("mem_pct")
-        is_crashed = fault_type == "pod_crash" and srv_id == target_service and cpu_pct is None
-
-        if is_crashed:
-            cpu, memory, latency, p99, err = 0.0, 0.0, 0.0, 0.0, 1.0
-        else:
-            cpu = (cpu_pct or 0.0) * CPU_RATIO_TO_PERCENT
-            limit_bytes = SERVICE_MEM_LIMIT_BYTES.get(srv_id, DEFAULT_MEM_LIMIT_BYTES)
-            memory = (mem_pct or 0.0) * limit_bytes
-            latency = n.get("mean_latency_ms", 0.0) * MS_TO_SECONDS
-            p99 = n.get("p99_latency_ms", 0.0) * MS_TO_SECONDS
-            err = n.get("error_rate", 0.0)
-
+        enc = encode_node(n, down)
         service_nodes.append(
             ServiceNode(
-                service_id=srv_id,
-                features={"cpu": cpu, "memory": memory, "latency": latency, "error_rate": err, "p99_latency": p99},
+                service_id=enc["service_id"],
+                features={k: enc[k] for k in ("cpu", "memory", "latency", "error_rate", "p99_latency")},
             )
         )
 

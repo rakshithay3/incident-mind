@@ -5,7 +5,9 @@ import shutil
 
 DATASETS_DIR = "datasets"
 COMPILED_DIR = "datasets_compiled"
-ZIP_OUTPUT = "shopmind_evaluation_dataset.zip"
+# Written to a NEW name so the original (target-aware) frozen set in
+# shopmind_evaluation_dataset.zip stays available for before/after numbers.
+ZIP_OUTPUT = "shopmind_evaluation_dataset_labelfree.zip"
 SCHEDULE_FILE = "evaluation_schedule.json"
 
 # UNIT FIX (see diagnose_feature_scale.py results, Sept 2026):
@@ -19,236 +21,37 @@ SCHEDULE_FILE = "evaluation_schedule.json"
 #   cpu_pct:         0 - 1        -> fraction (0-1 scale), needs x100
 #   mean_latency_ms: 0 - 2001     -> milliseconds, needs /1000
 #   mem_pct:         0 - 1        -> ratio, reconstructed as mem_pct * mem_limit_bytes
-CPU_RATIO_TO_PERCENT = 100.0
-MS_TO_SECONDS = 1.0 / 1000.0
+# Unit conversion, peak-snapshot selection and crash encoding all live in
+# shopmind_snapshot.py so the benchmark, replay_demo.py and live_demo.py
+# share one label-free implementation (see that module's docstring for why
+# the previous target-aware version here was replaced).
+from shopmind_snapshot import (  # noqa: E402
+    CPU_RATIO_TO_PERCENT,
+    DEFAULT_MEM_LIMIT_BYTES,
+    MS_TO_SECONDS,
+    SERVICE_MEM_LIMIT_BYTES,
+    baseline_averages as get_baseline_averages,
+    compile_telemetry,
+)
 
-SERVICE_MEM_LIMIT_BYTES = {
-    "frontend": 128 * 1024 * 1024,
-    "api-gateway": 128 * 1024 * 1024,
-    "auth-service": 384 * 1024 * 1024,
-    "user-service": 384 * 1024 * 1024,
-    "order-service": 384 * 1024 * 1024,
-    "payment-service": 384 * 1024 * 1024,
-    "inventory-service": 384 * 1024 * 1024,
-    "notification-service": 384 * 1024 * 1024,
-    "search-service": 384 * 1024 * 1024,
-    "cache": 192 * 1024 * 1024,
-    "postgres-primary": 512 * 1024 * 1024,
-    "postgres-replica": 512 * 1024 * 1024,
-    "prometheus": 384 * 1024 * 1024,
-    "jaeger": 384 * 1024 * 1024,
-    "docker-socket-proxy": 64 * 1024 * 1024,
-}
-DEFAULT_MEM_LIMIT_BYTES = 384 * 1024 * 1024
-
-def get_baseline_averages(baseline_history):
-    """Computes baseline average latency, cpu, and memory for all services."""
-    sums = {}
-    counts = {}
-    for snap in baseline_history:
-        for node in snap.get("nodes", []):
-            srv = node["service_id"]
-            if srv not in sums:
-                sums[srv] = {"cpu": 0.0, "memory": 0.0, "latency": 0.0}
-                counts[srv] = 0
-            
-            # Read original telemetry schema fields
-            sums[srv]["cpu"] += node.get("cpu_pct") or 0.0
-            sums[srv]["memory"] += node.get("mem_pct") or 0.0
-            sums[srv]["latency"] += node.get("mean_latency_ms") or 0.0
-            counts[srv] += 1
-            
-    averages = {}
-    for srv, m_sums in sums.items():
-        cnt = counts[srv] if counts[srv] > 0 else 1
-        averages[srv] = {
-            "cpu": m_sums["cpu"] / cnt,
-            "memory": m_sums["memory"] / cnt,
-            "latency": m_sums["latency"] / cnt
-        }
-    return averages
-
-def select_peak_anomaly_snapshot(failure_history, baseline_averages, target_service, fault_type):
-    """Dynamically identifies the snapshot with the highest anomaly score."""
-    if not failure_history:
-        return None
-        
-    best_snap = failure_history[0]
-    max_score = -1.0
-    
-    for snap in failure_history:
-        score = 0.0
-        for node in snap.get("nodes", []):
-            srv = node["service_id"]
-            base = baseline_averages.get(srv, {"cpu": 0.02, "memory": 0.1, "latency": 5.0})
-            
-            is_down = (node.get("cpu_pct") is None)
-            curr_cpu = node.get("cpu_pct") or 0.0
-            curr_mem = node.get("mem_pct") or 0.0
-            curr_lat = node.get("mean_latency_ms") or 0.0
-            curr_err = 1.0 if is_down else (node.get("error_rate") or 0.0)
-            
-            # Anomaly score based on absolute deviations from baseline
-            cpu_dev = max(0.0, curr_cpu - base["cpu"])
-            mem_dev = max(0.0, curr_mem - base["memory"])
-            lat_dev = max(0.0, curr_lat - base["latency"])
-            
-            # Weight target service symptoms higher to prevent bystander ratio spikes from biasing selection
-            is_target = (srv == target_service)
-            w = 3.0 if is_target else 1.0
-
-            score += ((cpu_dev * 5.0) + (mem_dev * 5.0) + curr_err * 10.0 + (lat_dev * 0.1)) * w
-                
-            # If the target service is actively down/unresponsive, that is the peak crash outage
-            if is_target and is_down:
-                score += 100.0
-                
-        if score > max_score:
-            max_score = score
-            best_snap = snap
-            
-    # Find index of the selected snap to guide our last-known-good history search
-    snap_idx = 15
-    for idx, s in enumerate(failure_history):
-        if s.get("timestamp") == best_snap.get("timestamp"):
-            snap_idx = idx
-            break
-            
-    return best_snap, snap_idx
-
-def find_last_known_good(service_id, key, snap_idx, failure_history, baseline_history, fallback_val):
-    """Searches backward in time for the most recent valid telemetry sample."""
-    # 1. Search failure history backwards starting from snap_idx - 1
-    for idx in range(snap_idx - 1, -1, -1):
-        for node in failure_history[idx].get("nodes", []):
-            if node["service_id"] == service_id:
-                val = node.get(key)
-                if val is not None:
-                    return val
-                    
-    # 2. Search baseline history backwards starting from the end
-    for idx in range(len(baseline_history) - 1, -1, -1):
-        for node in baseline_history[idx].get("nodes", []):
-            if node["service_id"] == service_id:
-                val = node.get(key)
-                if val is not None:
-                    return val
-                    
-    return fallback_val
 
 def compile_incident(inc_dir):
     series_path = os.path.join(inc_dir, "telemetry_series.json")
     if not os.path.exists(series_path):
         return None
-        
     with open(series_path, "r") as f:
         data = json.load(f)
-        
-    incident_id = data.get("incident_id")
-    target = data.get("target_service")
-    fault = data.get("fault_type")
-    
-    baseline_history = data.get("baseline_history", [])
-    failure_history = data.get("failure_history", [])
-    if not failure_history or not baseline_history:
-        return None
-        
-    # Calculate baseline averages and select the peak anomaly snapshot dynamically
-    baseline_averages = get_baseline_averages(baseline_history)
-    snap, snap_idx = select_peak_anomaly_snapshot(failure_history, baseline_averages, target, fault)
-    if not snap:
-        return None
-    
-    # 1. Compile Nodes and translate keys to GNN contract
-    compiled_nodes = []
-    for node in snap.get("nodes", []):
-        srv_id = node.get("service_id")
-        base = baseline_averages.get(srv_id, {"cpu": 0.02, "memory": 0.1, "latency": 5.0})
-        
-        # Check if this node is in a crashed state (offline / metrics scrape failed)
-        is_crashed = (fault == "pod_crash" and srv_id == target and node.get("cpu_pct") is None)
-        
-        if is_crashed:
-            # Crash encoding: Distinct from healthy "idle" state
-            # When a container crashes:
-            # - cpu: 0.0% (dead process)
-            # - memory: 0.0 bytes (no active allocation)
-            # - latency / p99_latency: 0.0s (no completed responses emitted)
-            # - error_rate: 1.0 (100% failure rate for all calls routed to it)
-            cpu = 0.0
-            memory_bytes = 0.0
-            latency = 0.0
-            p99_lat = 0.0
-            err_rate = 1.0
-        else:
-            # Standard telemetry extraction with last-known-good backfill
-            cpu = node.get("cpu_pct")
-            if cpu is None:
-                cpu = find_last_known_good(srv_id, "cpu_pct", snap_idx, failure_history, baseline_history, base["cpu"])
-            cpu = cpu * CPU_RATIO_TO_PERCENT
-
-            memory = node.get("mem_pct")
-            if memory is None:
-                memory = find_last_known_good(srv_id, "mem_pct", snap_idx, failure_history, baseline_history, base["memory"])
-            limit_bytes = SERVICE_MEM_LIMIT_BYTES.get(srv_id, DEFAULT_MEM_LIMIT_BYTES)
-            memory_bytes = memory * limit_bytes
-
-            latency = node.get("mean_latency_ms")
-            if latency is None:
-                latency = find_last_known_good(srv_id, "mean_latency_ms", snap_idx, failure_history, baseline_history, base["latency"])
-            latency = latency * MS_TO_SECONDS
-
-            p99_lat = node.get("p99_latency_ms")
-            if p99_lat is None:
-                p99_fallback = base["latency"] * 3.0 if base["latency"] > 0 else 20.0
-                p99_lat = find_last_known_good(srv_id, "p99_latency_ms", snap_idx, failure_history, baseline_history, p99_fallback)
-            p99_lat = p99_lat * MS_TO_SECONDS
-
-            err_rate = node.get("error_rate")
-            if err_rate is None:
-                err_rate = find_last_known_good(srv_id, "error_rate", snap_idx, failure_history, baseline_history, 0.0)
-
-        # Map values to the GNN schema expected by loader.py
-        compiled_nodes.append({
-            "service_id": srv_id,
-            "cpu": round(cpu, 4),               # now percent (0-100), matches RE1
-            "memory": round(memory_bytes, 2),   # now absolute bytes, matches RE1
-            "error_rate": round(err_rate, 4),
-            "latency": round(latency, 4),       # now seconds, matches RE1
-            "p99_latency": round(p99_lat, 4),   # now seconds, matches RE1
-            "label": 1 if srv_id == target else 0
-        })
-        
-    # 2. Compile Edges
-    compiled_edges = []
-    for edge in snap.get("edges", []):
-        compiled_edges.append({
-            "source": edge.get("source"),
-            "target": edge.get("target"),
-            "call_count": edge.get("call_count", 0)
-        })
-        
-    # 3. Assemble GNN payload
-    gnn_payload = {
-        "incident_id": incident_id,
-        "timestamp": snap.get("timestamp", ""),
-        "nodes": compiled_nodes,
-        "edges": compiled_edges,
-        "fault_injection": {
-            "active": True,
-            "fault_type": fault,
-            "target_service": target,
-            "injected_at": data.get("injected_at_epoch", "")
-        },
-        "root_cause": target,
-        "metadata": {
-            "fault_type": fault,
-            "dataset_version": "2026.07"
-        }
-    }
-    return gnn_payload
+    return compile_telemetry(data)
 
 def main():
+    import argparse
+    global DATASETS_DIR, ZIP_OUTPUT
+    parser = argparse.ArgumentParser(description="Compile raw ShopMind incidents into the GNN evaluation set")
+    parser.add_argument("--datasets-dir", default=DATASETS_DIR, help="folder of incident_*/telemetry_series.json")
+    parser.add_argument("--zip-output", default=ZIP_OUTPUT)
+    args = parser.parse_args()
+    DATASETS_DIR, ZIP_OUTPUT = args.datasets_dir, args.zip_output
+
     print("Starting evaluation dataset packaging...")
     
     if os.path.exists(COMPILED_DIR):

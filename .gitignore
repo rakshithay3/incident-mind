@@ -32,6 +32,7 @@ code-agent-history/
 scratch/
 *.zip
 !shopmind_evaluation_dataset.zip
+!shopmind_evaluation_dataset_labelfree.zip
 !demo_replay_auth_cpu.zip
 
 # ---------- Dashboard (Vismitha) ----------

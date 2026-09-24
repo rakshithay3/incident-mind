@@ -23,6 +23,12 @@ progressively less signal?
   Baseline C -- always greedily pick the top-ranked node, deterministically.
                 Has no memory across steps, so if its first (and only)
                 guess is wrong it never recovers within the step budget.
+  Baseline D -- sequential greedy: top-ranked NOT-yet-visited node, so it
+                walks ranks 1..budget. Solve rate == the scorer's PR@budget.
+                This is the fair "no learning" reference for PPO; C alone
+                is handicapped by design.
+  PPO+mask   -- same trained policy, with visited nodes masked out at
+                inference (no retraining).
 
 PPO's observation includes visited-service history, so unlike Baseline C it
 can actually use a wrong first guess to inform its next one -- Baselines A
@@ -45,7 +51,7 @@ from pathlib import Path
 
 from stable_baselines3 import PPO
 
-from incidentmind_p1.dispatch import PPODispatcher, baseline_a, baseline_b, greedy_baseline_c
+from incidentmind_p1.dispatch import PPODispatcher, baseline_a, baseline_b, baseline_d_sequential, greedy_baseline_c
 from incidentmind_p1.loader import load_dataset
 from incidentmind_p1.scoring import AnomalyScorer
 
@@ -98,6 +104,26 @@ def run_episode_baseline_stepped(dispatch_fn, ranked, incident, step_budget: int
         if target == incident.root_cause:
             return step, True
     return step_budget, False
+
+
+def run_episode_baseline_d(scorer: AnomalyScorer, incident, step_budget: int = STEP_BUDGET):
+    ranked = sorted(scorer.score_graph(incident), key=lambda s: s.rank)
+    return run_episode_baseline_stepped(baseline_d_sequential, ranked, incident, step_budget)
+
+
+def mcnemar(results_x, results_y):
+    """Exact McNemar on paired solved/unsolved outcomes:
+    (x_only, y_only, two-sided p or None when there are no discordant pairs)."""
+    x_only = sum(1 for (_, a), (_, b) in zip(results_x, results_y) if a and not b)
+    y_only = sum(1 for (_, a), (_, b) in zip(results_x, results_y) if b and not a)
+    n = x_only + y_only
+    if n == 0:
+        return x_only, y_only, None
+    from math import comb
+
+    k = min(x_only, y_only)
+    p = min(1.0, 2 * sum(comb(n, i) for i in range(k + 1)) / 2 ** n)
+    return x_only, y_only, p
 
 
 def run_episode_baseline_a(scorer: AnomalyScorer, incident, step_budget: int = STEP_BUDGET, seed: int = 0):
@@ -180,8 +206,11 @@ def main() -> None:
         scorer = AnomalyScorer()
     policy = PPO.load(args.model)
     dispatcher = PPODispatcher(policy=policy)
+    masked_dispatcher = PPODispatcher(policy=policy, mask_visited=True)
 
     ppo_results = [run_episode_ppo(dispatcher, scorer, inc, args.step_budget) for inc in test_incidents]
+    ppo_masked_results = [run_episode_ppo(masked_dispatcher, scorer, inc, args.step_budget) for inc in test_incidents]
+    baseline_d_results = [run_episode_baseline_d(scorer, inc, args.step_budget) for inc in test_incidents]
     baseline_a_results = [run_episode_baseline_a(scorer, inc, args.step_budget, seed=args.seed) for inc in test_incidents]
     baseline_b_results = [run_episode_baseline_b(scorer, inc, args.step_budget, seed=args.seed) for inc in test_incidents]
     greedy_results = [run_episode_greedy(scorer, inc, args.step_budget) for inc in test_incidents]
@@ -191,11 +220,20 @@ def main() -> None:
     baseline_a_summary = summarize(baseline_a_results, "Baseline A")
     baseline_b_summary = summarize(baseline_b_results, "Baseline B")
     greedy_summary = summarize(greedy_results, "Baseline C")
+    baseline_d_summary = summarize(baseline_d_results, "Baseline D")
+    summarize(ppo_masked_results, "PPO+mask")
 
     print()
     print(f"PPO solve rate advantage over Baseline A (random):    {ppo_summary['solve_rate'] - baseline_a_summary['solve_rate']:+.3f}")
     print(f"PPO solve rate advantage over Baseline B (threshold): {ppo_summary['solve_rate'] - baseline_b_summary['solve_rate']:+.3f}")
     print(f"PPO solve rate advantage over Baseline C (greedy):    {ppo_summary['solve_rate'] - greedy_summary['solve_rate']:+.3f}")
+    print(f"PPO solve rate advantage over Baseline D (sequential): {ppo_summary['solve_rate'] - baseline_d_summary['solve_rate']:+.3f}")
+    print()
+    for label, other in (("Baseline C", greedy_results), ("Baseline D", baseline_d_results)):
+        for name, res in (("PPO", ppo_results), ("PPO+mask", ppo_masked_results)):
+            x_only, y_only, p = mcnemar(res, other)
+            p_txt = "n/a" if p is None else f"{p:.4f}"
+            print(f"McNemar {name} vs {label}: {name}-only={x_only} {label}-only={y_only} p={p_txt}")
 
 
 if __name__ == "__main__":

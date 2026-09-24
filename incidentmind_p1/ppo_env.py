@@ -13,6 +13,11 @@ Reward shaping (fixed, matches the design already agreed for this project):
   -0.5  re-investigating an already-visited service
   budget: 5 steps per episode
 
+The reward depends only on target_service. The agent_type half of the
+action (log/metrics/code) never changes the reward, so the policy does not
+learn WHICH agent to send -- only which rank slot to inspect next. Don't
+claim agent selection as a learned behaviour.
+
 State/action space is fixed at MAX_SERVICES=12 (see dispatch.py) regardless
 of the sampled incident's actual node count, so the same trained policy runs
 unmodified on RE1 (<=12 nodes) and ShopMind (12 nodes) at inference time.

@@ -113,6 +113,18 @@ def baseline_b(
     raise ValueError("cannot dispatch without anomalous node scores")
 
 
+def baseline_d_sequential(
+    scores: Iterable[NodeScore], agent_type: str = "log", visited: Optional[Set] = None
+) -> DispatchDecision:
+    """Baseline D: sequential greedy -- the top-ranked service not yet
+    visited. Over a step budget B this inspects ranks 1..B in order, so its
+    solve rate equals the scorer's PR@B. It is the natural "engineer walks
+    down the ranked list" baseline; Baseline C (no memory) is not, because it
+    can never use steps 2..B.
+    """
+    return greedy_baseline_c(scores, agent_type=agent_type, visited=visited or set())
+
+
 def decode_action(action_index: int, ranked_scores: Sequence[NodeScore]) -> DispatchAction:
     """Map a flat action index in [0, ACTION_SPACE_SIZE) to a DispatchAction.
 
@@ -160,8 +172,14 @@ class PPODispatcher:
     back to Baseline C so downstream consumers can integrate early.
     """
 
-    def __init__(self, policy: Optional[object] = None) -> None:
+    def __init__(self, policy: Optional[object] = None, mask_visited: bool = False) -> None:
+        """mask_visited=True applies an inference-time action mask: among
+        actions whose decoded node is not yet visited, take the one the
+        policy rates most probable. Needs an SB3 policy (uses
+        policy.policy.get_distribution); the trained weights are unchanged.
+        With nothing visited it is identical to deterministic predict()."""
         self.policy = policy
+        self.mask_visited = mask_visited
 
     def choose(
         self,
@@ -176,6 +194,28 @@ class PPODispatcher:
         if self.policy is None:
             return greedy_baseline_c(ranked, visited=visited)
         observation = build_observation(ranked, visited)
+        if self.mask_visited and visited and hasattr(self.policy, "policy"):
+            return self._choose_masked(ranked, observation, visited, step)
         action_index, _ = self.policy.predict(observation, deterministic=True)
         action = decode_action(int(action_index), ranked)
         return DispatchDecision(step=step, action=action, policy_confidence=1.0)
+
+    def _choose_masked(self, ranked, observation, visited, step: int) -> DispatchDecision:
+        import numpy as np
+
+        sb3_policy = self.policy.policy
+        obs_tensor, _ = sb3_policy.obs_to_tensor(np.asarray(observation, dtype=np.float32))
+        probs = sb3_policy.get_distribution(obs_tensor).distribution.probs[0].detach().cpu().numpy()
+        best_index, best_prob, total = None, -1.0, 0.0
+        for index in range(ACTION_SPACE_SIZE):
+            node = ranked[(index % MAX_SERVICES) % len(ranked)]
+            if _node_key(node) in visited:
+                continue
+            total += float(probs[index])
+            if probs[index] > best_prob:
+                best_index, best_prob = index, float(probs[index])
+        if best_index is None:  # everything visited: fall back to the unmasked choice
+            best_index = int(np.argmax(probs))
+            best_prob, total = float(probs[best_index]), 1.0
+        action = decode_action(best_index, ranked)
+        return DispatchDecision(step=step, action=action, policy_confidence=best_prob / total if total else 0.0)
