@@ -78,7 +78,10 @@ def run_incident(incident_id, services_config, service_name, fault_type):
     failure_snapshots = []
     injected_time = time.time()
     for _ in range(30):
-        nodes, edges = export_metrics.collect_all_telemetry(services_config, 2)
+        # 10 s lookback, same as the baseline: Jaeger filters spans by START
+        # time, so a request delayed by 2 s (network_delay) never falls inside
+        # a 2 s window, and OTel batch export adds a few seconds on top.
+        nodes, edges = export_metrics.collect_all_telemetry(services_config, 10)
         failure_snapshots.append({"timestamp": time.time(), "nodes": nodes, "edges": edges})
         time.sleep(1)
         
