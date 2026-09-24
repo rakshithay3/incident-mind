@@ -1,0 +1,486 @@
+[
+ {
+  "run": "full_run_20260916T211133",
+  "fault_type": "cpu_stress",
+  "target": "auth-service",
+  "down_at_peak": [],
+  "edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "auth-service",
+     1.0
+    ],
+    [
+     "notification-service",
+     0.0
+    ],
+    [
+     "postgres-replica",
+     0.0
+    ]
+   ]
+  },
+  "no_edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "auth-service",
+     1.0
+    ],
+    [
+     "payment-service",
+     0.016
+    ],
+    [
+     "order-service",
+     0.003
+    ]
+   ]
+  }
+ },
+ {
+  "run": "full_run_20260916T211514_order_svc",
+  "fault_type": "cpu_stress",
+  "target": "order-service",
+  "down_at_peak": [],
+  "edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "order-service",
+     1.0
+    ],
+    [
+     "cache",
+     0.0
+    ],
+    [
+     "postgres-replica",
+     0.0
+    ]
+   ]
+  },
+  "no_edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "order-service",
+     1.0
+    ],
+    [
+     "auth-service",
+     0.003
+    ],
+    [
+     "payment-service",
+     0.003
+    ]
+   ]
+  }
+ },
+ {
+  "run": "full_run_20260916T211656_payment_svc",
+  "fault_type": "network_delay",
+  "target": "payment-service",
+  "down_at_peak": [],
+  "edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "payment-service",
+     0.0
+    ],
+    [
+     "postgres-primary",
+     0.0
+    ],
+    [
+     "order-service",
+     0.0
+    ]
+   ]
+  },
+  "no_edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "payment-service",
+     1.0
+    ],
+    [
+     "auth-service",
+     0.021
+    ],
+    [
+     "inventory-service",
+     0.007
+    ]
+   ]
+  }
+ },
+ {
+  "run": "full_run_20260916T211931_dual_fault",
+  "fault_type": "cpu_stress",
+  "target": "order-service",
+  "down_at_peak": [],
+  "edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "order-service",
+     1.0
+    ],
+    [
+     "inventory-service",
+     1.0
+    ],
+    [
+     "cache",
+     0.0
+    ]
+   ]
+  },
+  "no_edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "order-service",
+     1.0
+    ],
+    [
+     "inventory-service",
+     1.0
+    ],
+    [
+     "auth-service",
+     0.003
+    ]
+   ]
+  }
+ },
+ {
+  "run": "live_final_cpu_auth",
+  "fault_type": "cpu_stress",
+  "target": "auth-service",
+  "down_at_peak": [],
+  "edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "auth-service",
+     1.0
+    ],
+    [
+     "notification-service",
+     0.0
+    ],
+    [
+     "postgres-replica",
+     0.0
+    ]
+   ]
+  },
+  "no_edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "auth-service",
+     1.0
+    ],
+    [
+     "user-service",
+     0.018
+    ],
+    [
+     "order-service",
+     0.008
+    ]
+   ]
+  }
+ },
+ {
+  "run": "live_test_cpu_stress",
+  "fault_type": "cpu_stress",
+  "target": "auth-service",
+  "down_at_peak": [],
+  "edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "auth-service",
+     1.0
+    ],
+    [
+     "notification-service",
+     0.0
+    ],
+    [
+     "postgres-replica",
+     0.0
+    ]
+   ]
+  },
+  "no_edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "auth-service",
+     1.0
+    ],
+    [
+     "payment-service",
+     0.007
+    ],
+    [
+     "order-service",
+     0.003
+    ]
+   ]
+  }
+ },
+ {
+  "run": "live_test_memory_pressure",
+  "fault_type": "memory_pressure",
+  "target": "auth-service",
+  "down_at_peak": [],
+  "edges": {
+   "rank_of_target": 11,
+   "top3": [
+    [
+     "frontend",
+     0.0
+    ],
+    [
+     "postgres-replica",
+     0.0
+    ],
+    [
+     "user-service",
+     0.0
+    ]
+   ]
+  },
+  "no_edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "auth-service",
+     1.0
+    ],
+    [
+     "payment-service",
+     0.006
+    ],
+    [
+     "notification-service",
+     0.019
+    ]
+   ]
+  }
+ },
+ {
+  "run": "live_test_memory_pressure_v2",
+  "fault_type": "memory_pressure",
+  "target": "auth-service",
+  "down_at_peak": [],
+  "edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "auth-service",
+     1.0
+    ],
+    [
+     "notification-service",
+     0.0
+    ],
+    [
+     "postgres-replica",
+     0.0
+    ]
+   ]
+  },
+  "no_edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "auth-service",
+     1.0
+    ],
+    [
+     "search-service",
+     0.067
+    ],
+    [
+     "order-service",
+     0.004
+    ]
+   ]
+  }
+ },
+ {
+  "run": "live_test_network_delay",
+  "fault_type": "network_delay",
+  "target": "auth-service",
+  "down_at_peak": [],
+  "edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "auth-service",
+     0.237
+    ],
+    [
+     "cache",
+     0.0
+    ],
+    [
+     "frontend",
+     0.0
+    ]
+   ]
+  },
+  "no_edges": {
+   "rank_of_target": 1,
+   "top3": [
+    [
+     "auth-service",
+     1.0
+    ],
+    [
+     "payment-service",
+     0.005
+    ],
+    [
+     "order-service",
+     0.003
+    ]
+   ]
+  }
+ },
+ {
+  "run": "live_test_pod_crash",
+  "fault_type": "pod_crash",
+  "target": "auth-service",
+  "down_at_peak": [],
+  "edges": {
+   "rank_of_target": 8,
+   "top3": [
+    [
+     "notification-service",
+     1.0
+    ],
+    [
+     "payment-service",
+     0.0
+    ],
+    [
+     "inventory-service",
+     0.0
+    ]
+   ]
+  },
+  "no_edges": {
+   "rank_of_target": 2,
+   "top3": [
+    [
+     "order-service",
+     1.0
+    ],
+    [
+     "auth-service",
+     0.019
+    ],
+    [
+     "inventory-service",
+     0.006
+    ]
+   ]
+  }
+ },
+ {
+  "run": "live_test_pod_crash_payment",
+  "fault_type": "pod_crash",
+  "target": "payment-service",
+  "down_at_peak": [
+   "payment-service"
+  ],
+  "edges": {
+   "rank_of_target": 5,
+   "top3": [
+    [
+     "frontend",
+     0.0
+    ],
+    [
+     "postgres-replica",
+     0.0
+    ],
+    [
+     "auth-service",
+     0.0
+    ]
+   ]
+  },
+  "no_edges": {
+   "rank_of_target": 12,
+   "top3": [
+    [
+     "auth-service",
+     0.004
+    ],
+    [
+     "inventory-service",
+     0.006
+    ],
+    [
+     "order-service",
+     0.003
+    ]
+   ]
+  }
+ },
+ {
+  "run": "live_test_pod_crash_v2",
+  "fault_type": "pod_crash",
+  "target": "auth-service",
+  "down_at_peak": [
+   "auth-service"
+  ],
+  "edges": {
+   "rank_of_target": 5,
+   "top3": [
+    [
+     "frontend",
+     0.0
+    ],
+    [
+     "payment-service",
+     0.0
+    ],
+    [
+     "postgres-replica",
+     0.0
+    ]
+   ]
+  },
+  "no_edges": {
+   "rank_of_target": 12,
+   "top3": [
+    [
+     "payment-service",
+     0.453
+    ],
+    [
+     "search-service",
+     0.017
+    ],
+    [
+     "order-service",
+     0.003
+    ]
+   ]
+  }
+ }
+]
