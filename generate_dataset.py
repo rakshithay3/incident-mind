@@ -42,6 +42,11 @@ def run_incident(incident_id, services_config, service_name, fault_type):
         if cfg_s.get("role") == "app":
             send_post(f"http://{cfg_s['host']}:{cfg_s['port']}/reset", {})
             
+    # 0.5 Make sure nothing is left over from the previous incident BEFORE the
+    # baseline window (a stuck service would otherwise look "normal" at an
+    # elevated level in both baseline and failure snapshots).
+    pre_baseline_clean = ensure_clean(services_config, "pre-baseline")
+
     # 1. Start Load Generator Process
     load_proc = subprocess.Popen([sys.executable, "load_generator.py"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
@@ -82,8 +87,8 @@ def run_incident(incident_id, services_config, service_name, fault_type):
         if cfg_s.get("role") == "app":
             send_post(f"http://{cfg_s['host']}:{cfg_s['port']}/reset", {})
             
-    # 5.5 Dynamically verify all services are clean and settled (metrics-aware under active load)
-    wait_for_services_to_settle(services_config, timeout_sec=20)
+    # 5.5 Verify all services settled; restart any container that won't
+    ensure_clean(services_config, "post-fault")
             
     # 6. Terminate Load Generator
     load_proc.terminate()
@@ -100,6 +105,7 @@ def run_incident(incident_id, services_config, service_name, fault_type):
         "target_service": service_name,
         "fault_type": fault_type,
         "injected_at_epoch": injected_time,
+        "pre_baseline_clean": pre_baseline_clean,
         "baseline_history": baseline_snapshots,
         "failure_history": failure_snapshots
     }
@@ -111,6 +117,36 @@ def run_incident(incident_id, services_config, service_name, fault_type):
         print(f"Successfully saved incident telemetry series to {out_file}")
     except Exception as e:
         print(f"Error saving incident data: {e}")
+
+def stuck_services(services_config):
+    """App services that are unhealthy or still above the settle thresholds."""
+    stuck = []
+    for name, cfg in services_config.items():
+        if cfg.get("role") != "app":
+            continue
+        cpu, mem = get_service_metrics(cfg["host"], cfg["port"])
+        if cpu is None or cpu > 0.15 or (mem is not None and mem > 0.30):
+            stuck.append(name)
+    return stuck
+
+
+def ensure_clean(services_config, label):
+    """Settle check; if it times out, restart the stuck containers (a leaked
+    memory_pressure buffer otherwise stays in every later incident) and check
+    again. Returns True when every app service is back to baseline."""
+    if wait_for_services_to_settle(services_config, timeout_sec=20):
+        return True
+    stuck = stuck_services(services_config)
+    if stuck:
+        print(f"[{label}] Restarting stuck containers: {', '.join(stuck)}")
+        subprocess.run(["docker", "restart"] + [f"shopmind-{name}" for name in stuck],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(5)
+    ok = wait_for_services_to_settle(services_config, timeout_sec=60)
+    if not ok:
+        print(f"[{label}] WARNING: services still not clean: {stuck_services(services_config)}")
+    return ok
+
 
 def get_service_metrics(host, port):
     url = f"http://{host}:{port}/metrics"

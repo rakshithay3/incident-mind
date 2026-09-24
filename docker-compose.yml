@@ -49,7 +49,7 @@ services:
       - ./services/auth-service:/usr/src/app
     ports:
       - "3001:3001"
-    command: node server.js
+    command: node --expose-gc server.js
     environment:
       - PORT=3001
       - SERVICE_NAME=auth-service
@@ -68,7 +68,7 @@ services:
       - ./services/user-service:/usr/src/app
     ports:
       - "3002:3002"
-    command: node server.js
+    command: node --expose-gc server.js
     environment:
       - PORT=3002
       - SERVICE_NAME=user-service
@@ -87,7 +87,7 @@ services:
       - ./services/order-service:/usr/src/app
     ports:
       - "3003:3003"
-    command: node server.js
+    command: node --expose-gc server.js
     environment:
       - PORT=3003
       - SERVICE_NAME=order-service
@@ -108,7 +108,7 @@ services:
       - ./services/payment-service:/usr/src/app
     ports:
       - "3004:3004"
-    command: node server.js
+    command: node --expose-gc server.js
     environment:
       - PORT=3004
       - SERVICE_NAME=payment-service
@@ -129,7 +129,7 @@ services:
       - ./services/inventory-service:/usr/src/app
     ports:
       - "3005:3005"
-    command: node server.js
+    command: node --expose-gc server.js
     environment:
       - PORT=3005
       - SERVICE_NAME=inventory-service
@@ -148,7 +148,7 @@ services:
       - ./services/notification-service:/usr/src/app
     ports:
       - "3006:3006"
-    command: node server.js
+    command: node --expose-gc server.js
     environment:
       - PORT=3006
       - SERVICE_NAME=notification-service
@@ -167,7 +167,7 @@ services:
       - ./services/search-service:/usr/src/app
     ports:
       - "3007:3007"
-    command: node server.js
+    command: node --expose-gc server.js
     environment:
       - PORT=3007
       - SERVICE_NAME=search-service
