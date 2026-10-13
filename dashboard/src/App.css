@@ -362,8 +362,6 @@ button { font-family: inherit; }
 .pr-label { font-size: 12px; color: var(--text-3); }
 .pr-value { font-size: 24px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
 .eval-section-spacer { margin-top: 22px; }
-.eval-note-spacer { margin-top: 14px; }
-.eval-row-pending { color: var(--text-3); }
 .eval-pending { color: var(--text-3); font-style: italic; }
 
 /* --- Anomaly snapshot chart --------------------------------------------- */
