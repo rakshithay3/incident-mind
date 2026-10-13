@@ -33,7 +33,7 @@ ollama pull llama3.2:3b
 cd dashboard && npm install
 ```
 
-Model checkpoints (`models/graphsage.pt`, `models/ppo_dispatch.zip`) and RE1 data are not in git.
+Download graphsage.pt and ppo_dispatch.zip from the v1.1.0 release at https://github.com/rakshithay3/incident-mind/releases/tag/v1.1.0 and place them in models/. RE1 data is not in git; scripts/prepare_re1_data.py downloads it.
 
 ## Run the demo (replay)
 
