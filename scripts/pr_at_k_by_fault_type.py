@@ -6,8 +6,9 @@ metric table (cpu_stress / memory_pressure / network_delay / pod_crash) in
 one pass, using the same GraphSAGE + PPO checkpoints as evaluate_shopmind.py.
 
 Usage:
+    unzip -o shopmind_evaluation_dataset_labelfree.zip -d ../sm_labelfree
     PYTHONPATH=. python3 scripts/pr_at_k_by_fault_type.py \
-        --dataset ~/Desktop/shopmind_evaluation_dataset \
+        --dataset ../sm_labelfree \
         --model models/ppo_dispatch.zip \
         --graphsage-model models/graphsage.pt
 """

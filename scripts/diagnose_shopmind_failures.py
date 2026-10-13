@@ -4,8 +4,9 @@ are concentrated (e.g. on services/fault types RE1 never saw) or spread
 evenly (suggesting a general precision ceiling rather than a specific gap).
 
 Usage:
+    unzip -o shopmind_evaluation_dataset_labelfree.zip -d ../sm_labelfree
     PYTHONPATH=. python3 scripts/diagnose_shopmind_failures.py \
-        --dataset ~/Desktop/shopmind_evaluation_dataset \
+        --dataset ../sm_labelfree \
         --graphsage-model models/graphsage.pt
 """
 

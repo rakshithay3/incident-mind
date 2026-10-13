@@ -3,8 +3,9 @@ checkpoint -- no retraining, no PPO dispatch simulation. This is the direct
 apples-to-apples comparison against the RE1 test-split PR@1=0.920 number.
 
 Usage:
+    unzip -o shopmind_evaluation_dataset_labelfree.zip -d ../sm_labelfree
     PYTHONPATH=. python3 pr_at_k_shopmind.py \
-        --dataset ~/Desktop/shopmind_evaluation_dataset \
+        --dataset ../sm_labelfree \
         --graphsage-model models/graphsage.pt
 """
 

@@ -3,8 +3,9 @@ ShopMind dataset -- no train/test split, since ShopMind is already entirely
 held out for cross-topology generalization validation.
 
 Usage:
+    unzip -o shopmind_evaluation_dataset_labelfree.zip -d ../sm_labelfree
     PYTHONPATH=. python3 evaluate_shopmind.py \
-        --dataset /Users/rakshithayathiraj/Desktop/shopmind_evaluation_dataset \
+        --dataset ../sm_labelfree \
         --model models/ppo_dispatch.zip \
         --graphsage-model models/graphsage.pt
 """

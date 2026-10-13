@@ -3,9 +3,10 @@ the z-normalization fit on RE1 training data is pushing ShopMind features
 into a range the trained GraphSAGE encoder never saw.
 
 Usage:
+    unzip -o shopmind_evaluation_dataset_labelfree.zip -d ../sm_labelfree
     PYTHONPATH=. python3 diagnose_feature_scale.py \
         --re1-dataset data/rcaeval_re1 \
-        --shopmind-dataset /Users/rakshithayathiraj/Desktop/shopmind_evaluation_dataset \
+        --shopmind-dataset ../sm_labelfree \
         --graphsage-model models/graphsage.pt
 """
 
