@@ -45,7 +45,7 @@ Every microservice exposes a secure `/inject-fault` POST endpoint. The following
 
 ## 📊 GNN Data Pipeline Exporter
 
-The GNN telemetry exporter is implemented in Python ([export_metrics.py](file:///c:/Users/HP/.gemini/antigravity/scratch/shopmind/export_metrics.py) and [adjacency_export.py](file:///c:/Users/HP/.gemini/antigravity/scratch/shopmind/adjacency_export.py)). It scrapes system metrics and Jaeger traces, performs rank-correlation and structural schema checks, and exports validated graph data to the active dataset experiment directory.
+The GNN telemetry exporter is implemented in Python ([export_metrics.py](../export_metrics.py) and [adjacency_export.py](../adjacency_export.py)). It scrapes system metrics and Jaeger traces, performs rank-correlation and structural schema checks, and exports validated graph data to the active dataset experiment directory.
 
 > [!NOTE]
 > **Legacy Exporter Removal**: The legacy Node.js `telemetry-exporter` service has been deprecated and deleted from the codebase. All telemetry data collection and GNN feature exports now run exclusively via the Python pipeline.
