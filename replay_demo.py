@@ -54,7 +54,7 @@ from notifications.recovery import wait_for_recovery
 # Snapshot selection, crash encoding, unit conversion and edges come from
 # shopmind_snapshot.py -- the SAME label-free code that builds the
 # 100-incident benchmark (package_evaluation.py), so replay/live runs and
-# the paper's numbers see identical inputs. Previously this file had its own
+# the reported numbers see identical inputs. Previously this file had its own
 # copy that (a) only encoded a crash when srv_id == target_service, and
 # (b) passed edges=[], which turns GraphSAGE into a per-node MLP.
 from shopmind_snapshot import compile_telemetry, payload_to_graph, select_peak_snapshot  # noqa: E402

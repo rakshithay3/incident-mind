@@ -4,7 +4,7 @@ GraphSAGE is chosen over GCN specifically because it is inductive: it learns
 a per-node aggregation function rather than a fixed adjacency-conditioned
 transform, so a model trained on RCAEval (Online Boutique) graphs can run
 inference on an unseen ShopMind topology without retraining. That inductive
-generalization is the paper's core novelty claim, so this module must never
+generalization is the reported core novelty claim, so this module must never
 be trained on ShopMind -- ShopMind is validation-only.
 """
 

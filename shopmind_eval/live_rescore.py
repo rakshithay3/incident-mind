@@ -3,7 +3,7 @@ trained GraphSAGE: label-free compiler with edges vs the same input without
 edges. The pre-fix replay path used edges=[] (and target-aware crash
 encoding), so the "no edges" column is what the draft's live table measured.
 
-Usage: PYTHONPATH=. python3 paper/live_rescore.py [glob] > paper/live_rescore.json
+Usage: PYTHONPATH=. python3 shopmind_eval/live_rescore.py [glob] > shopmind_eval/live_rescore.json
 """
 import dataclasses
 import glob

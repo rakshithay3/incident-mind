@@ -78,7 +78,7 @@ def main() -> None:
         print(f"Scoring with trained GraphSAGE checkpoint: {args.graphsage_model}")
     else:
         print("WARNING: no --graphsage-model given -- falling back to AnomalyScorer (peer z-score). "
-              "This does NOT match the paper's GNN+PPO architecture; pass --graphsage-model for real runs.")
+              "This does NOT match the reported GNN+PPO architecture; pass --graphsage-model for real runs.")
         scorer = AnomalyScorer()
 
     if args.split == "train":

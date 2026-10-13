@@ -58,7 +58,7 @@ def main() -> None:
         "--graphsage-model",
         default=None,
         help="Path to trained GraphSAGE checkpoint (models/graphsage.pt). Falls back to "
-        "AnomalyScorer if omitted -- numbers won't match the paper's GNN+PPO architecture.",
+        "AnomalyScorer if omitted -- numbers won't match the reported GNN+PPO architecture.",
     )
     args = parser.parse_args()
 

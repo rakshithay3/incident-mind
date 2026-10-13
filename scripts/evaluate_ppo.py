@@ -202,7 +202,7 @@ def main() -> None:
         print(f"Scoring with trained GraphSAGE checkpoint: {args.graphsage_model}")
     else:
         print("WARNING: no --graphsage-model given -- evaluating against AnomalyScorer (peer z-score), "
-              "not the real GNN. Numbers here will NOT match the paper's GNN+PPO architecture.")
+              "not the real GNN. Numbers here will NOT match the reported GNN+PPO architecture.")
         scorer = AnomalyScorer()
     policy = PPO.load(args.model)
     dispatcher = PPODispatcher(policy=policy)

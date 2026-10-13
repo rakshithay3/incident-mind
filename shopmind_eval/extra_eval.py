@@ -5,7 +5,7 @@ from incidentmind_p1.training import load_checkpoint
 from priority.impact_weights import PriorityWeightedScorer
 import sys; sys.path.insert(0,'scripts'); import evaluate_ppo as ev
 enc, stats = load_checkpoint('models/graphsage.pt'); gs=GraphSAGEScorer(enc,stats); pw=PriorityWeightedScorer(gs)
-sm_path=sys.argv[1] if len(sys.argv)>1 else '../sm'  # usage: python3 paper/extra_eval.py <compiled ShopMind dir>
+sm_path=sys.argv[1] if len(sys.argv)>1 else '../sm'  # usage: python3 shopmind_eval/extra_eval.py <compiled ShopMind dir>
 sm=load_dataset(sm_path); re1=load_dataset('data/rcaeval_re1'); _,_,t=ev.split_incidents(re1,42)
 def hits(sc, incs, k):
     return [1 if inc.root_cause in [s.service_id for s in sorted(sc.score_graph(inc), key=lambda s:s.rank)][:k] else 0 for inc in incs]

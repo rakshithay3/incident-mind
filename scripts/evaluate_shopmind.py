@@ -91,7 +91,7 @@ def main() -> None:
     else:
         print(
             "WARNING: no --graphsage-model given -- evaluating against AnomalyScorer (peer "
-            "z-score), not the real GNN. Numbers here will NOT match the paper's GNN+PPO "
+            "z-score), not the real GNN. Numbers here will NOT match the reported GNN+PPO "
             "architecture."
         )
         scorer = AnomalyScorer()

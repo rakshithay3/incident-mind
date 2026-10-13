@@ -125,8 +125,8 @@ python3 scripts/diagnose_feature_scale.py \
 
 # 3. Paper numbers: localisation, edge ablation, dispatch (A/B/C/D, PPO,
 #    PPO+mask) with McNemar tests, then bootstrap CIs and random baselines.
-PYTHONPATH=. python3 paper/full_eval.py --shopmind-dataset ../sm_labelfree > paper/full_eval_labelfree.json
-PYTHONPATH=. python3 paper/extra_eval.py ../sm_labelfree > paper/extra_eval_labelfree.json
+PYTHONPATH=. python3 shopmind_eval/full_eval.py --shopmind-dataset ../sm_labelfree > shopmind_eval/full_eval_labelfree.json
+PYTHONPATH=. python3 shopmind_eval/extra_eval.py ../sm_labelfree > shopmind_eval/extra_eval_labelfree.json
 ```
 
 **Known data-contract gotchas (fixed in `archie/rakshithay3/incident-mind`

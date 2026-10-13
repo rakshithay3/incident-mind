@@ -1,7 +1,7 @@
-"""Numbers for the paper's localisation and dispatch tables.
+"""Numbers for the reported localisation and dispatch tables.
 
 Usage (repo root, venv active):
-    PYTHONPATH=. python3 paper/full_eval.py --shopmind-dataset ../sm > paper/full_eval_out.json
+    PYTHONPATH=. python3 shopmind_eval/full_eval.py --shopmind-dataset ../sm > shopmind_eval/full_eval_out.json
 
 --shopmind-dataset is a folder of compiled incident JSONs, e.g. the unzipped
 shopmind_evaluation_dataset_labelfree.zip written by package_evaluation.py.
