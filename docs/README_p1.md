@@ -2,8 +2,6 @@
 
 This repository contains Rakshitha's P1 workstream for IncidentMind: RCAEval ingestion, GraphSAGE-ready anomaly scoring, PPO dispatch contract output, and Baseline C greedy dispatch.
 
-The code is intentionally runnable with only the Python standard library for first-commit verification. When `torch`, `torch_geometric`, and `stable-baselines3` are available, the same contracts can be used by the real GraphSAGE and PPO training paths.
-
 ## What This Produces
 
 The P1 handoff JSON consumed by Dharunya's agents and Vismitha's dashboard:
@@ -38,29 +36,13 @@ The P1 handoff JSON consumed by Dharunya's agents and Vismitha's dashboard:
 }
 ```
 
-## Quick Start
-
-```bash
-python3 -m incidentmind_p1.cli score --incident data/sample_rcaeval/incidents/inc_001.json
-python3 -m incidentmind_p1.cli validate --dataset data/sample_rcaeval
-python3 -m incidentmind_p1.cli baseline-c --incident data/sample_rcaeval/incidents/inc_001.json
-python3 -m unittest discover -s tests
-```
-
-## Roadmap Alignment
-
-- Weeks 1-3: RCAEval data contract, loaders, GraphSAGE-ready graph objects, training loop skeleton.
-- Weeks 4-7: anomaly scorer, PPO dispatch interface, fast inference output for dashboard and agents.
-- Weeks 9-11: Baseline C, PR@k, MTTD, cross-app generalization hooks.
-
 ## Data Contract
 
 See [docs/data_contract.md](data_contract.md) for the exact input and output schemas.
 
 ## Full RE1 Run (VS Code / local shell)
 
-The steps above only exercise the dummy fixture (`inc_001.json`). To reproduce
-the real GraphSAGE training run on RCAEval RE1 (Online Boutique) locally:
+To reproduce the real GraphSAGE training run on RCAEval RE1 (Online Boutique) locally:
 
 ```bash
 python3 -m venv .venv
@@ -107,9 +89,6 @@ repo:
   services, 10 s Jaeger window and capped Jaeger).
 - `shopmind_evaluation_dataset_labelfree.zip` -- the same incidents compiled
   by `shopmind_snapshot.py`, which never reads the ground-truth label.
-- `shopmind_evaluation_dataset.zip` is the OLD set (Sep 6). Its snapshots
-  were chosen and crash-encoded using the injected target, so don't report
-  numbers from it; it is kept only for before/after comparison.
 
 ```bash
 # 1. Unzip the label-free compiled set (or rebuild it from the raw zip:
@@ -123,19 +102,39 @@ python3 scripts/diagnose_feature_scale.py \
     --shopmind-dataset ../sm_labelfree \
     --graphsage-model models/graphsage.pt
 
-# 3. Paper numbers: localisation, edge ablation, dispatch (A/B/C/D, PPO,
+# 3. Reported numbers: localisation, edge ablation, dispatch (A/B/C/D, PPO,
 #    PPO+mask) with McNemar tests, then bootstrap CIs and random baselines.
 PYTHONPATH=. python3 shopmind_eval/full_eval.py --shopmind-dataset ../sm_labelfree > shopmind_eval/full_eval_labelfree.json
 PYTHONPATH=. python3 shopmind_eval/extra_eval.py ../sm_labelfree > shopmind_eval/extra_eval_labelfree.json
 ```
 
-**Known data-contract gotchas (fixed in `archie/rakshithay3/incident-mind`
-commit `7d9c4f6`, tag `v1.0.0-eval-freeze`):** ShopMind's Prometheus export
-uses different units than RE1 for three of the five features. If
-`diagnose_feature_scale.py` flags any of these, check the exporter first:
+**Known data-contract gotchas:** ShopMind's Prometheus export uses different
+units than RE1 for three of the five features. If `diagnose_feature_scale.py`
+flags any of these, check the exporter first:
 - `cpu`: fraction (0-1) instead of percent (0-100)
 - `latency` / `p99_latency`: milliseconds instead of seconds
 - `memory`: usage/limit ratio instead of raw bytes -- this one cannot be
   fixed by a scale factor; it must be reconstructed as
   `mem_pct * mem_limit_bytes` using the `mem_limit` values declared per
   service in ShopMind's `docker-compose.yml`.
+
+## Legacy
+
+The code is intentionally runnable with only the Python standard library for first-commit verification. When `torch`, `torch_geometric`, and `stable-baselines3` are available, the same contracts can be used by the real GraphSAGE and PPO training paths.
+
+### Quick Start
+
+The steps below only exercise the dummy fixture (`inc_001.json`); see "Full RE1 Run" above for the real training run.
+
+```bash
+python3 -m incidentmind_p1.cli score --incident data/sample_rcaeval/incidents/inc_001.json
+python3 -m incidentmind_p1.cli validate --dataset data/sample_rcaeval
+python3 -m incidentmind_p1.cli baseline-c --incident data/sample_rcaeval/incidents/inc_001.json
+python3 -m unittest discover -s tests
+```
+
+### Roadmap Alignment
+
+- Weeks 1-3: RCAEval data contract, loaders, GraphSAGE-ready graph objects, training loop skeleton.
+- Weeks 4-7: anomaly scorer, PPO dispatch interface, fast inference output for dashboard and agents.
+- Weeks 9-11: Baseline C, PR@k, MTTD, cross-app generalization hooks.
