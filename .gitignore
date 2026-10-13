@@ -16,6 +16,7 @@ shopmind_evaluation_dataset/
 # Pipeline runtime output (reports, notification .eml + log.jsonl, captures)
 output/
 demo_result.json
+*.jsonl
 
 # ---------- ShopMind testbed (Archie) ----------
 logs/
@@ -37,6 +38,7 @@ scratch/
 # ---------- Dashboard (Vismitha) ----------
 node_modules/
 dashboard/dist/
+/package-lock.json
 # live demo result copied in at run time
 dashboard/public/demoResult.json
 dashboard/public/multiInstanceResult.json
