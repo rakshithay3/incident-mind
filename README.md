@@ -77,11 +77,7 @@ Localisation (PR@k): `shopmind_eval/full_eval_labelfree.json`.
 | RE1 test split (GraphSAGE) | 0.92 | 1.00 | 1.00 |
 | ShopMind, label-free (GraphSAGE) | 0.48 | 0.57 | 0.66 |
 
-Dispatch solve rate on ShopMind (5-step budget):
 
-| A | B | C | D | PPO | PPO+mask |
-| --- | --- | --- | --- | --- | --- |
-| 0.35 | 0.35 | 0.48 | 0.66 | 0.53 | 0.61 |
 
 How these were produced: `docs/rerun_after_leakage_fix.md`.
 
