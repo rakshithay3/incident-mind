@@ -7,11 +7,6 @@ import { useEvaluationSummary } from '../../hooks/useEvaluationSummary'
 //  2. the committed 100-incident evaluation run (evaluation/results/
 //     summary.json) -- real root-cause accuracy for the IncidentMind
 //     condition, broken down by fault type.
-//
-// There is no Baseline A/B/C data in the repo yet (no baseline agent runs
-// have been committed on any branch), so the comparison table only has one
-// real column. The other three render as "not yet run" -- filling them with
-// placeholder numbers would misrepresent the paper's central comparison.
 
 function computeFaultTypeBreakdown(incidents) {
   const byFault = {}
@@ -33,7 +28,7 @@ function computeFaultTypeBreakdown(incidents) {
 
 export default function EvaluationTab({ incident }) {
   const { pr_at_1, pr_at_3, pr_at_5 } = incident.metrics
-  const { summary, status, baselineFiles } = useEvaluationSummary()
+  const { summary, status } = useEvaluationSummary()
 
   const faultBreakdown = useMemo(() => {
     if (!summary?.incidents) return []
@@ -59,7 +54,7 @@ export default function EvaluationTab({ incident }) {
       </div>
 
       <div className="rca-section-label eval-section-spacer">
-        Baseline comparison ({summary?.summary?.total_incidents ?? '?'} ShopMind incidents)
+        Agent layer, 100 ShopMind incidents
       </div>
       <table className="leaderboard-table">
         <thead>
@@ -85,12 +80,6 @@ export default function EvaluationTab({ incident }) {
               </td>
             )}
           </tr>
-          {['Baseline A', 'Baseline B', 'Baseline C'].map(name => (
-            <tr key={name} className="eval-row-pending">
-              <td className="mono">{name}</td>
-              <td colSpan={3} className="eval-pending">not yet run</td>
-            </tr>
-          ))}
         </tbody>
       </table>
 
@@ -116,14 +105,6 @@ export default function EvaluationTab({ incident }) {
             </tbody>
           </table>
         </>
-      )}
-
-      {baselineFiles.length === 0 && (
-        <div className="wireframe-note eval-note-spacer">
-          Baseline A/B/C runs aren't in the repo yet. Wilcoxon significance
-          testing and the paper's Table 2 need those before they can be real
-          numbers rather than placeholders.
-        </div>
       )}
     </div>
   )
