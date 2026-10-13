@@ -1,15 +1,12 @@
-import { useState } from 'react'
-
 // Ranked root-cause list overlaid with the full RCA report once one is
 // available (RCAReport shape from schemas/contracts.py -- incident_id,
 // root_cause_service, confidence_score, evidence_summary, suggested_fix,
-// estimated_blast_radius, report_text: { en, hi }).
+// estimated_blast_radius, report_text: { en }).
 // Falls back to the rank-only wireframe when no report has been generated
 // yet for this incident (e.g. mock data, or a run where the Report Agent
 // hasn't finished).
 
 export default function RCAPanelTab({ incident }) {
-  const [lang, setLang] = useState('en')
   const ranked = [...incident.nodes].sort((a, b) => a.rank - b.rank).slice(0, 5)
   const report = incident.report
 
@@ -42,26 +39,10 @@ export default function RCAPanelTab({ incident }) {
                 confidence {(report.confidence_score * 100).toFixed(0)}%
               </span>
             </div>
-            {report.report_text?.hi && (
-              <div className="lang-toggle">
-                <button
-                  className={lang === 'en' ? 'lang-btn active' : 'lang-btn'}
-                  onClick={() => setLang('en')}
-                >
-                  EN
-                </button>
-                <button
-                  className={lang === 'hi' ? 'lang-btn active' : 'lang-btn'}
-                  onClick={() => setLang('hi')}
-                >
-                  HI
-                </button>
-              </div>
-            )}
           </div>
 
           <p className="rca-report-text">
-            {report.report_text?.[lang] ?? report.report_text?.en ?? 'No report text.'}
+            {report.report_text?.en ?? 'No report text.'}
           </p>
 
           {report.suggested_fix && (
