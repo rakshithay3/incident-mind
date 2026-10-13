@@ -27,7 +27,7 @@ REPORT_OK = """{
     ],
     "suggested_fix": "revert config change",
     "estimated_blast_radius": ["auth-service", "order-service"],
-    "report_text": {"en": "Root cause is auth-service.", "hi": "\\u092e\\u0942\\u0932 \\u0915\\u093e\\u0930\\u0923 auth-service \\u0939\\u0948\\u0964"}
+    "report_text": {"en": "Root cause is auth-service."}
 }"""
 
 
@@ -131,7 +131,7 @@ class RunInvestigationTest(unittest.TestCase):
         self.assertEqual(report["root_cause_service"], "auth-service")
         self.assertIn("report_text", report)
         self.assertIn("en", report["report_text"])
-        self.assertIn("hi", report["report_text"])
+        self.assertNotIn("hi", report["report_text"])
 
 
 if __name__ == "__main__":

@@ -262,7 +262,7 @@ def _normalize_report(report, incident_id):
             )
 
     # -----------------------------------------------------
-    # Bilingual report
+    # English report text
     # -----------------------------------------------------
 
     report_text = report.get(
@@ -281,16 +281,8 @@ def _normalize_report(report, incident_id):
         ""
     )
 
-    hindi_text = report_text.get(
-        "hi",
-        ""
-    )
-
     if english_text is None:
         english_text = ""
-
-    if hindi_text is None:
-        hindi_text = ""
 
     # -----------------------------------------------------
     # Final normalized report
@@ -317,9 +309,6 @@ def _normalize_report(report, incident_id):
         "report_text": {
             "en": str(
                 english_text
-            ),
-            "hi": str(
-                hindi_text
             )
         }
     }
@@ -334,7 +323,7 @@ def generate_report(
     incident_id="inc_001"
 ):
     """
-    Generate an evidence-grounded bilingual RCA report.
+    Generate an evidence-grounded English RCA report.
     """
 
     # -----------------------------------------------------
@@ -422,8 +411,7 @@ IMPORTANT RULES:
 8. estimated_blast_radius may contain ONLY services
    explicitly supported by the findings.
 
-9. English and Hindi must communicate exactly
-   the same conclusion.
+9. Write the report text in English only.
 
 10. Return ONLY valid JSON.
 
@@ -442,8 +430,7 @@ OUTPUT:
     "suggested_fix": "evidence-based recommendation",
     "estimated_blast_radius": [],
     "report_text": {{
-        "en": "English RCA report",
-        "hi": "Hindi RCA report"
+        "en": "English RCA report"
     }}
 }}
 """
@@ -519,11 +506,6 @@ OUTPUT:
                         "The Report Agent could not "
                         "complete the RCA because the "
                         "LLM request failed or timed out."
-                    ),
-                    "hi": (
-                        "एलएलएम अनुरोध विफल होने या "
-                        "समय समाप्त होने के कारण "
-                        "रिपोर्ट एजेंट RCA पूरा नहीं कर सका।"
                     )
                 }
             },
@@ -628,12 +610,6 @@ OUTPUT:
                 "en": (
                     "The Report Agent did not "
                     "return valid structured JSON."
-                ),
-
-                "hi": (
-                    "रिपोर्ट एजेंट ने मान्य "
-                    "संरचित JSON प्रतिक्रिया "
-                    "नहीं दी।"
                 )
             }
         }

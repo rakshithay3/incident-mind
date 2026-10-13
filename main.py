@@ -67,11 +67,6 @@ def main():
     print("-" * 60)
     print(report["report_text"]["en"])
 
-    print("\n" + "-" * 60)
-    print("Hindi Report:")
-    print("-" * 60)
-    print(report["report_text"]["hi"])
-
     print("\n" + "=" * 60)
     print("              INVESTIGATION COMPLETE")
     print("=" * 60)
