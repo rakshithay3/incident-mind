@@ -193,10 +193,9 @@ class EvidenceSummary(TypedDict):
 
 
 class ReportText(TypedDict):
-    """Bilingual report text."""
+    """English report text."""
 
     en: str
-    hi: str
 
 
 class RCAReport(TypedDict):

@@ -139,9 +139,6 @@ print(report["estimated_blast_radius"])
 print("\nEnglish Report:")
 print(report["report_text"]["en"])
 
-print("\nHindi Report:")
-print(report["report_text"]["hi"])
-
 
 # ==========================================
 # PIPELINE VALIDATION TESTS
