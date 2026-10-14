@@ -52,7 +52,7 @@ DEFAULT_OUTPUT = "dashboard/public/demoResult.json"
 DEFAULT_OUT_DIR = "output/watcher"
 DOWN_WINDOW = 3          # snapshots used for down-detection (needs >= 2 None in a row)
 LOOKBACK_SEC = 10        # Jaeger lookback per collect, same as the other capture scripts
-FAULT_STATUS_TIMEOUT_SEC = 1.0
+FAULT_STATUS_TIMEOUT_SEC = 3.0
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +62,7 @@ class BaselineBuffer:
     """Rolling window of healthy snapshots. Callers only add() snapshots the
     gate judged healthy, so a fault never ends up in the baseline."""
 
-    def __init__(self, size: int = 8) -> None:
+    def __init__(self, size: int = 30) -> None:
         self._snaps: deque = deque(maxlen=size)
 
     def add(self, snap: dict) -> None:
@@ -129,8 +129,8 @@ class Event:
 class WatcherConfig:
     gate: float = 3.0
     threshold: float = 0.5
-    confirm: int = 2
-    baseline_size: int = 8
+    confirm: int = 3
+    baseline_size: int = 30
     min_baseline: int = 5
     capture_sec: float = 20.0
     cooldown_healthy: int = 5
@@ -291,19 +291,25 @@ class IncidentStateMachine:
 # dashboard can show whether the label-free detection got it right.
 # ---------------------------------------------------------------------------
 def probe_fault_status(config: Dict[str, dict], timeout: float = FAULT_STATUS_TIMEOUT_SEC) -> List[dict]:
-    """Best-effort GET /fault-status on every app service; active faults only."""
-    active = []
-    for name, cfg in config.items():
-        if cfg.get("role") != "app":
-            continue
+    """Best-effort GET /fault-status on every app service, in parallel; active
+    faults only. The timeout must outlast the faults themselves: network_delay
+    holds every request (including /fault-status) for 2 s by default."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def fetch(item):
+        name, cfg = item
         try:
             with urllib.request.urlopen(f"http://{cfg['host']}:{cfg['port']}/fault-status", timeout=timeout) as resp:
                 status = json.loads(resp.read().decode("utf-8"))
         except Exception:
-            continue
-        if status.get("active"):
-            active.append({**status, "target_service": status.get("target_service") or name})
-    return active
+            return None
+        return {**status, "target_service": status.get("target_service") or name} if status.get("active") else None
+
+    apps = [(n, c) for n, c in config.items() if c.get("role") == "app"]
+    if not apps:
+        return []
+    with ThreadPoolExecutor(max_workers=len(apps)) as pool:
+        return [s for s in pool.map(fetch, apps) if s]
 
 
 def resolve_ground_truth(*probes: Sequence[dict]) -> Optional[dict]:
@@ -532,11 +538,11 @@ def _ts() -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Watch ShopMind telemetry and run the IncidentMind pipeline on anomalies")
     parser.add_argument("--poll-sec", type=float, default=2.0)
-    parser.add_argument("--baseline-size", type=int, default=8)
+    parser.add_argument("--baseline-size", type=int, default=30)
     parser.add_argument("--min-baseline", type=int, default=5)
     parser.add_argument("--gate", type=float, default=3.0, help="Max scaled deviation of the newest snapshot that trips the gate")
     parser.add_argument("--threshold", type=float, default=0.5, help="Min GraphSAGE node anomaly_score to count a poll")
-    parser.add_argument("--confirm", type=int, default=2, help="Consecutive gate+GraphSAGE polls needed")
+    parser.add_argument("--confirm", type=int, default=3, help="Consecutive gate+GraphSAGE polls needed")
     parser.add_argument("--capture-sec", type=float, default=20.0)
     parser.add_argument("--cooldown-healthy", type=int, default=5)
     parser.add_argument("--min-gap-sec", type=float, default=60.0)

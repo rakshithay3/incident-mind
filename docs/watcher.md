@@ -62,11 +62,11 @@ never passed to the gate, GraphSAGE, PPO or the agents.
 | Flag | Default | |
 |---|---|---|
 | `--poll-sec` | 2.0 | poll interval |
-| `--baseline-size` | 8 | rolling healthy baseline |
+| `--baseline-size` | 30 | rolling healthy baseline |
 | `--min-baseline` | 5 | healthy snapshots before `armed` |
 | `--gate` | 3.0 | gate threshold (scaled deviation) |
 | `--threshold` | 0.5 | min GraphSAGE node score |
-| `--confirm` | 2 | consecutive polls where gate AND GraphSAGE hold |
+| `--confirm` | 3 | consecutive polls where gate AND GraphSAGE hold |
 | `--capture-sec` | 20 | extra failure capture after confirmation |
 | `--cooldown-healthy` | 5 | healthy polls before re-arming |
 | `--min-gap-sec` | 60 | min seconds between incident starts |
@@ -82,6 +82,12 @@ never passed to the gate, GraphSAGE, PPO or the agents.
 
 ## Limitations
 
+- **GraphSAGE misses memory_pressure and pod_crash.** In live tests (Oct 2026)
+  the gate tripped within 4 s for both (search-service memory 10% -> 57%;
+  inventory-service down for ~28 s), but GraphSAGE scored every node 0.000,
+  so neither was confirmed. cpu_stress (1.000) and network_delay (0.92) are
+  caught in 3-12 s. Because confirmation requires GraphSAGE, those two fault
+  types are currently not detected on their own.
 - Start it while ShopMind is healthy: whatever the first `--min-baseline`
   healthy-looking polls show becomes "normal".
 - A permanent shift (e.g. traffic doubles and stays) keeps tripping the gate;
