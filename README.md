@@ -51,6 +51,8 @@ Tab 3:
 cd dashboard && npm run dev
 ```
 
+To have faults detected and investigated automatically, run `PYTHONPATH=. python3 incident_watcher.py`; see `docs/watcher.md`.
+
 Multi-instance view: run `multi_instance_receiver.py`, have each instance POST telemetry, then
 ```
 PYTHONPATH=. python3 cross_instance_dispatch_demo.py --output multi_instance_result.json
