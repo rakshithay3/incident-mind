@@ -5,7 +5,7 @@ injection on ShopMind and replay_demo.py's full inference pipeline.
 Uses pieces that already exist, unchanged:
   - export_metrics.py::collect_all_telemetry()   (Archie, Prometheus+Jaeger scrape)
   - <service>/inject-fault HTTP endpoint          (Archie, per-service server.js)
-  - docker logs <container>                       (standard docker CLI)
+  - docker logs --since <baseline start> <container>  (standard docker CLI)
 
 Produces exactly what replay_demo.py already expects:
   <out_dir>/telemetry_series.json   (baseline_history + failure_history)
@@ -40,6 +40,7 @@ import socket
 import subprocess
 import time
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 from export_metrics import collect_all_telemetry, load_services
@@ -102,15 +103,22 @@ def post_to_receiver(telemetry: dict, instance_id: str, receiver_url: str) -> No
         print(f"  WARNING: could not post telemetry to {receiver_url}: {e}")
 
 
-def capture_logs(out_dir: Path, services: list[str], tail: int = LOG_TAIL_LINES) -> None:
+def utc_now_iso() -> str:
+    """Current UTC time as RFC 3339, the form `docker logs --since` accepts."""
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def capture_logs(out_dir: Path, services: list[str], since: str, tail: int = LOG_TAIL_LINES) -> None:
     """Pull docker logs for each service into <service>.log, matching the
-    naming convention replay_demo.py already looks for."""
+    naming convention replay_demo.py already looks for. Only lines logged at
+    or after `since` (the UTC baseline start) are kept, so container logs
+    from earlier incidents never reach the telemetry or the agents."""
     for service in services:
         container = f"{CONTAINER_PREFIX}{service}"
         log_path = out_dir / f"{service}.log"
         try:
             result = subprocess.run(
-                ["docker", "logs", "--tail", str(tail), container],
+                ["docker", "logs", "--since", since, "--timestamps", "--tail", str(tail), container],
                 capture_output=True, text=True, timeout=10,
             )
             log_path.write_text(result.stdout + result.stderr)
@@ -143,6 +151,7 @@ def main() -> None:
     incident_id = args.incident_id or f"live_{args.target_service}_{args.fault_type}_{int(time.time())}"
 
     print(f"[1/5] Capturing baseline ({BASELINE_SNAPSHOTS} snapshots)...")
+    baseline_started_at = utc_now_iso()  # logs before this belong to earlier incidents
     baseline_history = capture_window(config, BASELINE_SNAPSHOTS, BASELINE_INTERVAL_SEC)
 
     print(f"[2/5] Injecting fault and capturing failure window ({args.duration_sec}s)...")
@@ -154,6 +163,7 @@ def main() -> None:
         "incident_id": incident_id,
         "target_service": args.target_service,
         "fault_type": args.fault_type,
+        "baseline_started_at": baseline_started_at,
         "baseline_history": baseline_history,
         "failure_history": failure_history,
     }
@@ -168,8 +178,8 @@ def main() -> None:
         print(f"[3/5] Posting telemetry to multi_instance_receiver.py as instance_id={args.instance_id}...")
         post_to_receiver(telemetry, args.instance_id, args.receiver_url)
 
-    print("[4/5] Capturing service logs...")
-    capture_logs(out_dir, list(config.keys()))
+    print(f"[4/5] Capturing service logs since {baseline_started_at}...")
+    capture_logs(out_dir, list(config.keys()), since=baseline_started_at)
 
     print("[5/5] Done.")
     if args.run_pipeline:

@@ -17,8 +17,9 @@ label-free shopmind_snapshot.py code.
                      polls); if it trips, GraphSAGE must also score some node
                      >= --threshold. --confirm consecutive polls -> incident.
     capturing     -- --capture-sec more failure_history, then write
-                     <out-dir>/auto_<epoch>/telemetry_series.json + logs and
-                     run the pipeline in a worker thread.
+                     <out-dir>/auto_<epoch>/telemetry_series.json + logs
+                     (only lines since the baseline started) and run the
+                     pipeline in a worker thread.
     cooldown      -- no new incident until --cooldown-healthy healthy polls
                      AND --min-gap-sec since the last one AND no investigation
                      running; then the baseline is refilled from scratch.
@@ -58,21 +59,33 @@ FAULT_STATUS_TIMEOUT_SEC = 3.0
 # ---------------------------------------------------------------------------
 # Pure detection logic (no I/O; collector, scorer and clock are injected)
 # ---------------------------------------------------------------------------
+def _utc_iso(epoch: float) -> str:
+    """RFC 3339 UTC ("...Z"), the form `docker logs --since` accepts."""
+    return datetime.fromtimestamp(epoch, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
 class BaselineBuffer:
     """Rolling window of healthy snapshots. Callers only add() snapshots the
     gate judged healthy, so a fault never ends up in the baseline."""
 
     def __init__(self, size: int = 30) -> None:
         self._snaps: deque = deque(maxlen=size)
+        self._times: deque = deque(maxlen=size)  # wall-clock epoch per snapshot
 
-    def add(self, snap: dict) -> None:
+    def add(self, snap: dict, at: Optional[float] = None) -> None:
         self._snaps.append(snap)
+        self._times.append(at)
 
     def snapshots(self) -> List[dict]:
         return list(self._snaps)
 
+    def started_at(self) -> Optional[float]:
+        """Wall-clock epoch of the oldest snapshot still in the buffer."""
+        return self._times[0] if self._times else None
+
     def clear(self) -> None:
         self._snaps.clear()
+        self._times.clear()
 
     def __len__(self) -> int:
         return len(self._snaps)
@@ -204,6 +217,7 @@ class IncidentStateMachine:
         self._capture: List[dict] = []
         self._capture_start = 0.0
         self._frozen_baseline: List[dict] = []
+        self._baseline_started_at: Optional[float] = None
         self.incidents = 0
 
     @property
@@ -237,7 +251,7 @@ class IncidentStateMachine:
         gate = self.gate.evaluate(self.baseline.snapshots(), list(self.window))
         if self.state == "warming":
             if gate.healthy:
-                self.baseline.add(snap)
+                self.baseline.add(snap, self.wall_clock())
                 if len(self.baseline) >= self.cfg.min_baseline:
                     self.state = "armed"
                     return [Event("armed", f"armed ({len(self.baseline)} healthy baseline snapshots)", gate=gate)]
@@ -247,7 +261,7 @@ class IncidentStateMachine:
         if not gate.tripped:
             self.streak = self.gnn_streak = 0
             if gate.healthy:
-                self.baseline.add(snap)
+                self.baseline.add(snap, self.wall_clock())
             return []
 
         if self.investigation_running():
@@ -285,6 +299,7 @@ class IncidentStateMachine:
         self._capture_start = self.clock()
         self._capture = list(self.window)  # include the confirm window
         self._frozen_baseline = copy.deepcopy(self.baseline.snapshots())
+        self._baseline_started_at = self.baseline.started_at()
         return [Event("confirmed", f"incident {self.incident_id} confirmed ({mode})", incident_id=self.incident_id,
                       gate=gate, anomaly=anomaly, detection=mode)]
 
@@ -299,6 +314,9 @@ class IncidentStateMachine:
             "fault_type": "unknown",
             "detected_at": datetime.fromtimestamp(self.wall_clock(), timezone.utc).isoformat(timespec="seconds"),
             "detection": self.detection_mode,
+            # UTC start of this incident's window; run_pipeline passes it to
+            # `docker logs --since` so older incidents' log lines are dropped.
+            "baseline_started_at": _utc_iso(self._baseline_started_at),
             "baseline_history": self._frozen_baseline,
             "failure_history": self._capture,
         }
@@ -496,7 +514,7 @@ def run_pipeline(incident_dir: Path, telemetry: dict, ground_truth: Optional[dic
     from stable_baselines3 import PPO
 
     telemetry_path = incident_dir / "telemetry_series.json"
-    capture_logs(incident_dir, services)
+    capture_logs(incident_dir, services, since=telemetry["baseline_started_at"])
 
     notifier = recipients_info = None
     if args.notify:

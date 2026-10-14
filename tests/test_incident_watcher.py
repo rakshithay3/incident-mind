@@ -3,6 +3,7 @@
 import random
 import re
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,6 +15,10 @@ APPS = ["auth-service", "user-service", "order-service", "payment-service",
         "inventory-service", "notification-service", "search-service"]
 INFRA = ["frontend", "api-gateway", "cache", "postgres-primary", "postgres-replica"]
 POLL = 2.0
+
+
+def _iso(epoch):
+    return datetime.fromtimestamp(epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _snap(rng, overrides=None):
@@ -275,8 +280,25 @@ class ResultTest(unittest.TestCase):
     def test_baseline_buffer_rolls(self):
         buf = BaselineBuffer(3)
         for i in range(5):
-            buf.add({"i": i})
+            buf.add({"i": i}, at=100.0 + i)
         self.assertEqual([s["i"] for s in buf.snapshots()], [2, 3, 4])
+        self.assertEqual(buf.started_at(), 102.0)
+        buf.clear()
+        self.assertIsNone(buf.started_at())
+
+    def test_baseline_started_at_bounds_each_incident_log_window(self):
+        # Logs are pulled with `docker logs --since telemetry["baseline_started_at"]`;
+        # the second incident's window must start after the first incident ended.
+        h = Harness(min_gap_sec=0).arm().feed(30, HOT)
+        first = h.kinds("incident")[0].telemetry
+        self.assertEqual(first["baseline_started_at"], "2023-11-14T22:13:20Z")  # epoch 1_700_000_000
+        first_end = h.now
+        h.feed(12).feed(30, HOT)
+        incidents = h.kinds("incident")
+        self.assertEqual(len(incidents), 2)
+        second = incidents[1].telemetry["baseline_started_at"]
+        self.assertRegex(second, r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+        self.assertGreater(second, _iso(1_700_000_000 + first_end))
 
 
 if __name__ == "__main__":
