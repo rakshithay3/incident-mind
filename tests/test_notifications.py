@@ -82,6 +82,30 @@ class RecipientsTest(unittest.TestCase):
         self.assertIn("me@gmail.com", [r["email"] for r in out["recipients"]])
         self.assertNotIn("me@gmail.com", self.cache.read_text())
 
+    def test_exclude_list(self):
+        def emails(env, fetch=lambda url: USERS):
+            return [r["email"] for r in get_recipients(env, self.cache, fetch=fetch)["recipients"]]
+
+        baseline = emails({})
+        self.assertEqual(baseline, ["priya@gmail.com", "RAVI@outlook.com"])
+
+        # empty / whitespace-only var changes nothing
+        self.assertEqual(emails({"IM_NOTIFY_EXCLUDE": ""}), baseline)
+        self.assertEqual(emails({"IM_NOTIFY_EXCLUDE": " , "}), baseline)
+
+        # excluded email removed, matched case-insensitively with whitespace trimmed
+        self.assertEqual(emails({"IM_NOTIFY_EXCLUDE": " PRIYA@Gmail.com "}), ["RAVI@outlook.com"])
+        self.assertEqual(emails({"IM_NOTIFY_EXCLUDE": "ravi@OUTLOOK.com,nobody@x.org"}), ["priya@gmail.com"])
+
+        # still excluded when served only from the cache (auth-service down)
+        self.assertEqual(emails({"IM_NOTIFY_EXCLUDE": "priya@gmail.com"}, fetch=lambda url: None), ["RAVI@outlook.com"])
+        # cache keeps the user, so removing the exclusion brings them back
+        self.assertIn("priya@gmail.com", self.cache.read_text())
+        self.assertEqual(emails({}, fetch=lambda url: None), baseline)
+
+        # also applies to IM_NOTIFY_TO extras
+        self.assertNotIn("me@gmail.com", emails({"IM_NOTIFY_TO": "me@gmail.com", "IM_NOTIFY_EXCLUDE": "ME@gmail.com"}))
+
 
 def _snap(**overrides):
     base = {

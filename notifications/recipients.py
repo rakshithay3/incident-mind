@@ -18,6 +18,10 @@ Env vars:
                           so a broken api-gateway doesn't block the lookup)
     IM_SKIP_DOMAINS       default example.com,example.org,example.net,shopmind.io
     IM_NOTIFY_TO          optional extra addresses, always included
+    IM_NOTIFY_EXCLUDE     optional addresses never notified (comma-separated,
+                          case-insensitive); applied after the live+cache merge,
+                          so excluded users stay out even if they're cached or
+                          re-register. The cache itself is left unchanged.
 """
 
 from __future__ import annotations
@@ -39,6 +43,11 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 def _skip_domains(env) -> set:
     raw = env.get("IM_SKIP_DOMAINS", DEFAULT_SKIP_DOMAINS)
     return {d.strip().lower() for d in raw.split(",") if d.strip()}
+
+
+def _excluded(env) -> set:
+    raw = env.get("IM_NOTIFY_EXCLUDE", "")
+    return {e.strip().lower() for e in raw.split(",") if e.strip()}
 
 
 def filter_users(users: List[Dict], skip_domains: set) -> List[Dict[str, str]]:
@@ -121,4 +130,6 @@ def get_recipients(env=None, cache_path: Path = DEFAULT_CACHE, fetch=fetch_shopm
         source = "cache"
     else:
         source = "extra" if extra else "none"
-    return {"recipients": merged, "source": source}
+    excluded = _excluded(env)
+    recipients = [r for r in merged if r["email"].lower() not in excluded]
+    return {"recipients": recipients, "source": source}
