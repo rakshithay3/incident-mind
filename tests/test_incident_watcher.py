@@ -6,7 +6,8 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from incident_watcher import BaselineBuffer, IncidentStateMachine, WatcherConfig, build_result, resolve_ground_truth
+from incident_watcher import (BaselineBuffer, IncidentStateMachine, WatcherConfig, build_result, gate_ranking,
+                              resolve_ground_truth)
 
 ROOT = Path(__file__).resolve().parent.parent
 APPS = ["auth-service", "user-service", "order-service", "payment-service",
@@ -32,6 +33,8 @@ def _snap(rng, overrides=None):
 
 HOT = {"auth-service": {"cpu_pct": 0.95}}
 DOWN = {"auth-service": {"cpu_pct": None, "mem_pct": None}}
+MEM = {"search-service": {"mem_pct": 0.57}}
+CRASH = {"inventory-service": {"cpu_pct": None, "mem_pct": None}}
 
 
 def fake_anomaly(telemetry):
@@ -45,12 +48,18 @@ def fake_anomaly(telemetry):
     return 0.1
 
 
+def blind_anomaly(telemetry):
+    """GraphSAGE as observed live on memory_pressure / pod_crash: 0.000."""
+    assert "target_service" not in telemetry and "fault_type" not in telemetry
+    return 0.0
+
+
 class Harness:
-    def __init__(self, running=lambda: False, **cfg):
+    def __init__(self, running=lambda: False, anomaly_fn=fake_anomaly, **cfg):
         self.now = 0.0
         self.rng = random.Random(7)
         self.machine = IncidentStateMachine(
-            WatcherConfig(**cfg), APPS, fake_anomaly, running,
+            WatcherConfig(**cfg), APPS, anomaly_fn, running,
             clock=lambda: self.now, wall_clock=lambda: 1_700_000_000 + self.now,
         )
         self.events = []
@@ -164,6 +173,52 @@ class CooldownTest(unittest.TestCase):
         self.assertTrue(h.kinds("suppressed"))
 
 
+class FallbackTest(unittest.TestCase):
+    def test_off_by_default_gate_alone_never_confirms(self):
+        self.assertFalse(WatcherConfig().fallback)
+        h = Harness(anomaly_fn=blind_anomaly).arm().feed(30, MEM).feed(30, CRASH)
+        self.assertEqual(h.kinds("confirmed"), [])
+
+    def test_memory_fault_confirms_via_gate_fallback(self):
+        h = Harness(anomaly_fn=blind_anomaly, fallback=True).arm().feed(30, MEM)
+        confirmed = h.kinds("confirmed")
+        self.assertEqual(len(confirmed), 1)
+        self.assertEqual(confirmed[0].detection, "gate-fallback")
+        incident = h.kinds("incident")[0]
+        self.assertEqual(incident.detection, "gate-fallback")
+        self.assertEqual(incident.telemetry["detection"], "gate-fallback")
+
+    def test_sustained_down_confirms_via_gate_fallback(self):
+        h = Harness(anomaly_fn=blind_anomaly, fallback=True).arm().feed(30, CRASH)
+        self.assertEqual([e.detection for e in h.kinds("confirmed")], ["gate-fallback"])
+
+    def test_graphsage_still_wins_when_it_agrees(self):
+        h = Harness(fallback=True).arm().feed(30, HOT)
+        self.assertEqual([e.detection for e in h.kinds("confirmed")], ["graphsage"])
+
+    def test_fallback_still_needs_consecutive_polls(self):
+        h = Harness(anomaly_fn=blind_anomaly, fallback=True).arm()
+        h.feed(2, MEM).feed(1).feed(2, MEM).feed(20)
+        self.assertEqual(h.kinds("confirmed"), [])
+        self.assertEqual(Harness(anomaly_fn=blind_anomaly, fallback=True).arm().feed(30).kinds("confirmed"), [])
+
+    def test_gate_ranking_puts_down_first_then_largest_deviation(self):
+        rng = random.Random(3)
+        baseline = [_snap(rng) for _ in range(8)]
+        both = {**MEM, **CRASH}
+        ranked = gate_ranking({"baseline_history": baseline, "failure_history": [_snap(rng, both) for _ in range(3)]})
+        self.assertEqual([s.service_id for s in ranked[:2]], ["inventory-service", "search-service"])
+        self.assertEqual([s.rank for s in ranked], list(range(1, len(ranked) + 1)))
+        self.assertEqual(ranked[0].anomaly_score, 1.0)
+        self.assertEqual(ranked[1].anomaly_score, 1.0)   # (0.57 - 0.10) / 0.05 = 9.4 >= 2 x gate
+        self.assertEqual([s.status for s in ranked[:3]], ["anomalous", "anomalous", "normal"])
+        self.assertTrue(all(0.0 <= s.anomaly_score <= 1.0 for s in ranked))
+
+        ranked = gate_ranking({"baseline_history": baseline, "failure_history": [_snap(rng, MEM) for _ in range(3)]})
+        self.assertEqual(ranked[0].service_id, "search-service")
+        self.assertTrue(all(s.status == "normal" for s in ranked[1:]))
+
+
 class ResultTest(unittest.TestCase):
     def _scores(self):
         ids = ["auth-service", "order-service", "user-service", "cache", "frontend", "search-service"]
@@ -187,6 +242,17 @@ class ResultTest(unittest.TestCase):
         self.assertEqual(result["metrics"]["pr_at_1"], 1.0)
         self.assertEqual(result["fault_type"], "cpu_stress")
         self.assertEqual(result["ground_truth"], "fault-status")
+        self.assertEqual(result["detection"], "graphsage")
+        self.assertEqual(result["metrics"]["ranking"], "graphsage_raw")
+
+    def test_build_result_marks_gate_fallback(self):
+        scores = self._scores()
+        result = build_result("auto_1", "t", scores, scores, [], {"agent_type": "log", "target_service": "x",
+                              "policy_confidence": 0.1}, None, detection="gate-fallback",
+                              detection_info={"detected_at": "t", "fallback_enabled": True})
+        self.assertEqual(result["detection"], "gate-fallback")
+        self.assertEqual(result["metrics"]["ranking"], "gate_fallback")
+        self.assertTrue(result["detection_info"]["fallback_enabled"])
 
     def test_interim_and_unknown_ground_truth(self):
         scores = self._scores()

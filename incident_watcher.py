@@ -115,6 +115,32 @@ class GateDetector:
         return GateResult(score=score, down=down, tripped=bool(down) or score >= self.gate, has_null=has_null)
 
 
+def gate_ranking(telemetry: dict, gate: float = 3.0) -> list:
+    """--fallback ranking: a fixed RULE, not the learned model. On the
+    label-free peak snapshot, services that are down come first, then the
+    rest by their largest scaled deviation above baseline (snapshot_score's
+    units). anomaly_score maps that into [0, 1] for PPO's observation:
+    down -> 1.0, deviation of 2x --gate or more -> 1.0, and the score is
+    >= 0.5 ("anomalous") exactly when the deviation reaches --gate."""
+    from incidentmind_p1.contracts import DEFAULT_EMBEDDING_DIM, NodeScore
+    from shopmind_snapshot import select_peak_snapshot
+
+    baseline = telemetry.get("baseline_history", [])
+    snap, _idx, down = select_peak_snapshot(telemetry.get("failure_history", []), baseline)
+    if snap is None:
+        return []
+    stats = baseline_stats(baseline)
+    devs = {n["service_id"]: snapshot_score({"nodes": [n]}, stats, set()) for n in snap.get("nodes", [])}
+    order = sorted(devs, key=lambda sid: (sid not in down, -devs[sid], sid))
+    scores = []
+    for rank, sid in enumerate(order, start=1):
+        is_down = sid in down
+        score = 1.0 if is_down else min(1.0, max(0.0, devs[sid]) / (2 * gate))
+        scores.append(NodeScore(service_id=sid, anomaly_score=round(score, 6), embedding_dim=DEFAULT_EMBEDDING_DIM,
+                                status="anomalous" if is_down or devs[sid] >= gate else "normal", rank=rank))
+    return scores
+
+
 @dataclass
 class Event:
     kind: str  # armed | stack_down | suspect | suppressed | confirmed | incident | rearming
@@ -123,6 +149,7 @@ class Event:
     telemetry: Optional[dict] = None
     gate: Optional[GateResult] = None
     anomaly: Optional[float] = None
+    detection: Optional[str] = None  # "graphsage" | "gate-fallback" on confirmed/incident
 
 
 @dataclass
@@ -136,6 +163,7 @@ class WatcherConfig:
     cooldown_healthy: int = 5
     min_gap_sec: float = 60.0
     min_app_up: int = 4
+    fallback: bool = False  # rule-based: confirm on the gate alone when GraphSAGE stays below threshold
 
 
 class IncidentStateMachine:
@@ -168,10 +196,11 @@ class IncidentStateMachine:
         self.gate = GateDetector(config.gate, self.app_services)
         self.window: deque = deque(maxlen=DOWN_WINDOW)
         self.state = "warming"
-        self.streak = 0
+        self.streak = self.gnn_streak = 0
         self.healthy_streak = 0
         self.last_incident_start: Optional[float] = None
         self.incident_id: Optional[str] = None
+        self.detection_mode = "graphsage"
         self._capture: List[dict] = []
         self._capture_start = 0.0
         self._frozen_baseline: List[dict] = []
@@ -188,7 +217,7 @@ class IncidentStateMachine:
 
     def step(self, snap: Optional[dict]) -> List[Event]:
         if snap is None:
-            self.streak = self.healthy_streak = 0
+            self.streak = self.gnn_streak = self.healthy_streak = 0
             return [Event("stack_down", "telemetry collector failed")]
 
         if self.state == "capturing":
@@ -197,7 +226,7 @@ class IncidentStateMachine:
         if not self._stack_up(snap):
             # Too few app services answering = stack down / restarting, not
             # an incident. Drop the window so a None run can't carry over.
-            self.streak = self.healthy_streak = 0
+            self.streak = self.gnn_streak = self.healthy_streak = 0
             self.window.clear()
             return [Event("stack_down", "stack not up (too few app services responding)")]
 
@@ -216,13 +245,13 @@ class IncidentStateMachine:
 
         # armed
         if not gate.tripped:
-            self.streak = 0
+            self.streak = self.gnn_streak = 0
             if gate.healthy:
                 self.baseline.add(snap)
             return []
 
         if self.investigation_running():
-            self.streak = 0
+            self.streak = self.gnn_streak = 0
             return [Event("suppressed", "gate tripped but an investigation is still running", gate=gate)]
 
         # Label-free: only baseline/failure history, no target_service/fault_type.
@@ -231,24 +260,33 @@ class IncidentStateMachine:
             "baseline_history": self.baseline.snapshots(),
             "failure_history": list(self.window),
         })
-        if anomaly < self.cfg.threshold:
-            self.streak = 0
-            return [Event("suspect", f"gate tripped but GraphSAGE max={anomaly:.3f} < threshold",
-                          gate=gate, anomaly=anomaly)]
-
+        # streak counts gate-tripped polls (only used with --fallback);
+        # gnn_streak counts polls where GraphSAGE agreed as well.
         self.streak += 1
-        if self.streak < self.cfg.confirm:
-            return [Event("suspect", f"suspect {self.streak}/{self.cfg.confirm}", gate=gate, anomaly=anomaly)]
+        self.gnn_streak = self.gnn_streak + 1 if anomaly >= self.cfg.threshold else 0
+        if self.gnn_streak >= self.cfg.confirm:
+            mode = "graphsage"
+        elif self.cfg.fallback and self.streak >= self.cfg.confirm:
+            mode = "gate-fallback"
+        elif anomaly < self.cfg.threshold:
+            if not self.cfg.fallback:
+                self.streak = 0
+            tail = f" (fallback {self.streak}/{self.cfg.confirm})" if self.cfg.fallback else ""
+            return [Event("suspect", f"gate tripped but GraphSAGE max={anomaly:.3f} < threshold{tail}",
+                          gate=gate, anomaly=anomaly)]
+        else:
+            return [Event("suspect", f"suspect {self.gnn_streak}/{self.cfg.confirm}", gate=gate, anomaly=anomaly)]
 
-        self.streak = 0
+        self.streak = self.gnn_streak = 0
+        self.detection_mode = mode
         self.state = "capturing"
         self.incident_id = f"auto_{int(self.wall_clock())}"
         self.last_incident_start = self.clock()
         self._capture_start = self.clock()
         self._capture = list(self.window)  # include the confirm window
         self._frozen_baseline = copy.deepcopy(self.baseline.snapshots())
-        return [Event("confirmed", f"incident {self.incident_id} confirmed", incident_id=self.incident_id,
-                      gate=gate, anomaly=anomaly)]
+        return [Event("confirmed", f"incident {self.incident_id} confirmed ({mode})", incident_id=self.incident_id,
+                      gate=gate, anomaly=anomaly, detection=mode)]
 
     def _step_capturing(self, snap: dict) -> List[Event]:
         self._capture.append(snap)
@@ -260,6 +298,7 @@ class IncidentStateMachine:
             "target_service": "unknown",
             "fault_type": "unknown",
             "detected_at": datetime.fromtimestamp(self.wall_clock(), timezone.utc).isoformat(timespec="seconds"),
+            "detection": self.detection_mode,
             "baseline_history": self._frozen_baseline,
             "failure_history": self._capture,
         }
@@ -269,7 +308,7 @@ class IncidentStateMachine:
         self.incidents += 1
         self._capture = []
         return [Event("incident", f"captured {len(telemetry['failure_history'])} snapshots",
-                      incident_id=self.incident_id, telemetry=telemetry)]
+                      incident_id=self.incident_id, telemetry=telemetry, detection=self.detection_mode)]
 
     def _step_cooldown(self, snap: dict) -> List[Event]:
         # Health is judged against the frozen pre-incident baseline.
@@ -280,7 +319,7 @@ class IncidentStateMachine:
             self.state = "warming"
             self.baseline.clear()
             self.window.clear()
-            self.streak = self.healthy_streak = 0
+            self.streak = self.gnn_streak = self.healthy_streak = 0
             return [Event("rearming", "recovered; refilling baseline")]
         return []
 
@@ -337,11 +376,15 @@ def build_result(
     recovery: Optional[dict] = None,
     notifications: Optional[list] = None,
     fault_injection_state: str = "resolved",
-    detection: Optional[dict] = None,
+    detection: str = "graphsage",
+    detection_info: Optional[dict] = None,
 ) -> dict:
     """ranked / raw_ranked / multi_fault_nodes are NodeScore-like objects
     (service_id, anomaly_score, status, rank); dispatch is
-    {agent_type, target_service, policy_confidence}."""
+    {agent_type, target_service, policy_confidence}. detection is
+    "graphsage" (learned model confirmed and ranked) or "gate-fallback"
+    (--fallback rule confirmed and ranked; see gate_ranking)."""
+    ranking = "gate_fallback" if detection == "gate-fallback" else "graphsage_raw"
     truth = ground_truth["target_service"] if ground_truth else None
     if truth:
         raw_ids = [s.service_id for s in raw_ranked]
@@ -349,10 +392,10 @@ def build_result(
             "pr_at_1": 1.0 if raw_ids[:1] == [truth] else 0.0,
             "pr_at_3": 1.0 if truth in raw_ids[:3] else 0.0,
             "pr_at_5": 1.0 if truth in raw_ids[:5] else 0.0,
-            "ranking": "graphsage_raw",
+            "ranking": ranking,
         }
     else:
-        metrics = {"pr_at_1": 0.0, "pr_at_3": 0.0, "pr_at_5": 0.0, "ranking": "graphsage_raw"}
+        metrics = {"pr_at_1": 0.0, "pr_at_3": 0.0, "pr_at_5": 0.0, "ranking": ranking}
 
     result = {
         "incident_id": incident_id,
@@ -376,9 +419,10 @@ def build_result(
         "notifications": list(notifications or []),
         "metrics": metrics,
         "ground_truth": "fault-status" if truth else "unavailable",
+        "detection": detection,
     }
-    if detection:
-        result["detection"] = detection
+    if detection_info:
+        result["detection_info"] = detection_info
     return result
 
 
@@ -440,7 +484,7 @@ class GraphSAGEProbe:
 
 
 def run_pipeline(incident_dir: Path, telemetry: dict, ground_truth: Optional[dict], args, services: List[str],
-                 detection: dict) -> None:
+                 detection_info: dict) -> None:
     """Same flow as replay_demo.main(), in-process, for a label-free capture."""
     import replay_demo
     from incidentmind_p1.dispatch import PPODispatcher
@@ -464,10 +508,16 @@ def run_pipeline(incident_dir: Path, telemetry: dict, ground_truth: Optional[dic
         print(f"  [{telemetry['incident_id']}] users to notify on recovery: {len(recipients_info['recipients'])}")
 
     incident = replay_demo.compile_live_snapshot(telemetry)
-    encoder, stats = load_checkpoint(args.graphsage_model)
-    base_scorer = GraphSAGEScorer(encoder, stats)
-    raw_ranked = sorted(base_scorer.score_graph(incident), key=lambda s: s.rank)
-    ranked = sorted(PriorityWeightedScorer(base_scorer).score_graph(incident), key=lambda s: s.rank)
+    detection = telemetry.get("detection", "graphsage")
+    if detection == "gate-fallback":
+        # Rule-based ranking (not the learned model): GraphSAGE didn't flag
+        # this incident, so PPO dispatches on gate deviation instead.
+        raw_ranked = ranked = gate_ranking(telemetry, args.gate)
+    else:
+        encoder, stats = load_checkpoint(args.graphsage_model)
+        base_scorer = GraphSAGEScorer(encoder, stats)
+        raw_ranked = sorted(base_scorer.score_graph(incident), key=lambda s: s.rank)
+        ranked = sorted(PriorityWeightedScorer(base_scorer).score_graph(incident), key=lambda s: s.rank)
     multi_fault_nodes = detect_multi_fault(ranked)
 
     decision = PPODispatcher(policy=PPO.load(args.ppo_model)).choose(ranked, visited=set(), step=1)
@@ -478,7 +528,7 @@ def run_pipeline(incident_dir: Path, telemetry: dict, ground_truth: Optional[dic
         "policy_confidence": decision.policy_confidence,
     }
     tag = f"[{incident.incident_id}]"
-    print(f"  {tag} GraphSAGE top-5: " + ", ".join(f"{s.service_id}={s.anomaly_score:.3f}" for s in raw_ranked[:5]))
+    print(f"  {tag} {'gate-fallback' if detection == 'gate-fallback' else 'GraphSAGE'} top-5: " + ", ".join(f"{s.service_id}={s.anomaly_score:.3f}" for s in raw_ranked[:5]))
     print(f"  {tag} PPO dispatch: {dispatch['agent_type']} -> {top_service} (conf {decision.policy_confidence:.2f})")
 
     def publish(result: dict) -> None:
@@ -487,7 +537,7 @@ def run_pipeline(incident_dir: Path, telemetry: dict, ground_truth: Optional[dic
 
     common = dict(incident_id=incident.incident_id, timestamp=incident.timestamp, ranked=ranked,
                   raw_ranked=raw_ranked, multi_fault_nodes=multi_fault_nodes, dispatch=dispatch,
-                  ground_truth=ground_truth, detection=detection)
+                  ground_truth=ground_truth, detection=detection, detection_info=detection_info)
     publish(build_result(**common, fault_injection_state="active"))
     print(f"  {tag} interim result written to {args.output}; running agents...")
 
@@ -547,6 +597,9 @@ def main() -> None:
     parser.add_argument("--cooldown-healthy", type=int, default=5)
     parser.add_argument("--min-gap-sec", type=float, default=60.0)
     parser.add_argument("--min-app-up", type=int, default=4, help="Fewer responding app services = 'stack not up'")
+    parser.add_argument("--fallback", action="store_true",
+                        help="Rule-based: confirm on the gate alone when GraphSAGE stays below --threshold, "
+                             "and rank by gate deviation (off by default)")
     parser.add_argument("--graphsage-model", default="models/graphsage.pt")
     parser.add_argument("--ppo-model", default="models/ppo_dispatch.zip")
     parser.add_argument("--code-repo-path", default=None)
@@ -568,7 +621,7 @@ def main() -> None:
         gate=args.gate, threshold=args.threshold, confirm=args.confirm,
         baseline_size=args.baseline_size, min_baseline=args.min_baseline,
         capture_sec=args.capture_sec, cooldown_healthy=args.cooldown_healthy,
-        min_gap_sec=args.min_gap_sec, min_app_up=args.min_app_up,
+        min_gap_sec=args.min_gap_sec, min_app_up=args.min_app_up, fallback=args.fallback,
     )
     worker: Dict[str, Optional[threading.Thread]] = {"thread": None}
 
@@ -582,7 +635,8 @@ def main() -> None:
     confirmed_wall: Dict[str, float] = {}
 
     print(f"[{_ts()}] watching {len(app_services)} app services every {args.poll_sec}s "
-          f"(gate={cfg.gate}, threshold={cfg.threshold}, confirm={cfg.confirm})"
+          f"(gate={cfg.gate}, threshold={cfg.threshold}, confirm={cfg.confirm}"
+          f"{', fallback on' if cfg.fallback else ''})"
           f"{' [dry-run]' if args.dry_run else ''}")
     last_down_msg = 0.0
     try:
@@ -595,7 +649,7 @@ def main() -> None:
                         last_down_msg = time.monotonic()
                 elif ev.kind == "confirmed":
                     confirmed_wall[ev.incident_id] = time.time()
-                    print(f"[{_ts()}] DETECTED {ev.incident_id}: gate={ev.gate.score:.2f} "
+                    print(f"[{_ts()}] DETECTED {ev.incident_id} [{ev.detection}]: gate={ev.gate.score:.2f} "
                           f"down={sorted(ev.gate.down)} graphsage_max={ev.anomaly:.3f}; capturing {cfg.capture_sec:.0f}s")
                     # Evaluation only (see resolve_ground_truth); not used for detection.
                     pending_truth[ev.incident_id] = [] if args.dry_run else probe_fault_status(services_config)
@@ -607,17 +661,18 @@ def main() -> None:
                         continue
                     truth = resolve_ground_truth(pending_truth.pop(ev.incident_id, []),
                                                  probe_fault_status(services_config))
-                    detection = {
+                    detection_info = {
                         "detected_at": ev.telemetry["detected_at"],
                         "detection_latency_sec": _detection_latency(truth, confirmed_wall.pop(ev.incident_id, time.time())),
                         "gate": cfg.gate, "threshold": cfg.threshold, "confirm": cfg.confirm,
+                        "fallback_enabled": cfg.fallback,
                     }
                     incident_dir = Path(args.out_dir) / ev.incident_id
                     write_json_atomic(incident_dir / "telemetry_series.json", ev.telemetry)
                     print(f"[{_ts()}] wrote {incident_dir / 'telemetry_series.json'}; ground truth: "
                           f"{(truth['target_service'] + '/' + truth['fault_type']) if truth else 'unavailable'}")
 
-                    def work(d=incident_dir, tel=ev.telemetry, gt=truth, det=detection):
+                    def work(d=incident_dir, tel=ev.telemetry, gt=truth, det=detection_info):
                         try:
                             run_pipeline(d, tel, gt, args, list(services_config.keys()), det)
                         except Exception as exc:
