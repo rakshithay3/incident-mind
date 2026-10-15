@@ -127,6 +127,27 @@ class RoundsLoopTest(unittest.TestCase):
         self.assertEqual(out["services_tried"], ["auth-service", "payment-service"])
         self.assertEqual(len(out["rounds"]), 2)
 
+    def test_rounds_entry_records_top5_ranking_and_logs_pick(self):
+        logs = []
+        h = Harness(recover_on=2)
+        h.rescore = lambda r: _ranked(["order-service", "auth-service", "payment-service", "cart-service",
+                                       "user-service", "ship-service"])
+        out = run_recovery_rounds(
+            "auth-service", {"report": {"root_cause_service": "auth-service"}}, _ranked(),
+            wait=h.wait, rescore=h.rescore, choose=h.choose, investigate=h.investigate, log=logs.append,
+        )
+        self.assertIsNone(out["rounds"][0]["ranking"])
+        self.assertEqual(out["rounds"][1]["ranking"], [
+            {"service": "order-service", "score": 1.0},
+            {"service": "auth-service", "score": 0.9},
+            {"service": "payment-service", "score": 0.8},
+            {"service": "cart-service", "score": 0.7},
+            {"service": "user-service", "score": 0.6},
+        ])
+        self.assertIn("  [round 2] ranking: order-service 1.000, auth-service 0.900, payment-service 0.800, "
+                      "cart-service 0.700, user-service 0.600 | visited: auth-service | PPO picked order-service",
+                      logs)
+
     def test_failed_rescore_keeps_previous_ranking(self):
         h = Harness(recover_on=2)
 
@@ -239,7 +260,7 @@ class ResultSchemaTest(unittest.TestCase):
                            "target_service": "payment-service", "policy_confidence": 0.5}, None,
                            recovery=rounds[-1]["recovery"], rounds=rounds)
         self.assertEqual([r["target_service"] for r in res["rounds"]], ["auth-service", "payment-service"])
-        self.assertEqual(set(res["rounds"][0]), {"round", "target_service", "report_root_cause", "recovery"})
+        self.assertEqual(set(res["rounds"][0]), {"round", "target_service", "report_root_cause", "recovery", "ranking"})
         self.assertEqual(build_result("inc", "t", [], [], [], {}, None)["rounds"], [])
 
 

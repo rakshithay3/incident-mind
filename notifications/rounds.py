@@ -17,6 +17,12 @@ from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from incidentmind_p1.dispatch import baseline_d_sequential
 
+RANKING_TOP_N = 5
+
+
+def _top_ranking(ranked: Sequence, n: int = RANKING_TOP_N) -> List[Dict[str, Any]]:
+    return [{"service": s.service_id, "score": round(float(s.anomaly_score), 4)} for s in list(ranked)[:n]]
+
 
 def run_recovery_rounds(
     target: str,
@@ -39,10 +45,13 @@ def run_recovery_rounds(
     investigate(target, round_no)   -> run_investigation() result
 
     Returns {"rounds", "recovered", "recovery", "investigation", "target",
-    "decision" (None if round 1 was final), "ranked", "services_tried"}."""
+    "decision" (None if round 1 was final), "ranked", "services_tried"}.
+    Each rounds entry carries "ranking": the top-5 (service, score) the PPO
+    chose that round's target from (None for round 1, which wasn't re-scored)."""
     visited: List[str] = [target]
     rounds: List[Dict[str, Any]] = []
     decision = None
+    ranking = None
     round_no = 1
     while True:
         recovery = wait(round_no)
@@ -51,6 +60,7 @@ def run_recovery_rounds(
             "target_service": target,
             "report_root_cause": (investigation.get("report") or {}).get("root_cause_service"),
             "recovery": recovery,
+            "ranking": ranking,
         })
         log(f"  [round {round_no}] {target} -> {recovery.get('outcome', 'recovered' if recovery.get('recovered') else 'not_recovered')}")
         if recovery.get("recovered") or round_no >= max_rounds:
@@ -68,12 +78,19 @@ def run_recovery_rounds(
             break
 
         step = round_no + 1
+        ranking = _top_ranking(ranked)
         decision = choose(ranked, set(visited), step)
-        if decision.action.target_service in visited:
+        ppo_pick = decision.action.target_service
+        log(f"  [round {step}] ranking: "
+            + ", ".join(f"{r['service']} {r['score']:.3f}" for r in ranking)
+            + f" | visited: {', '.join(visited)} | PPO picked {ppo_pick}")
+        if ppo_pick in visited:
             # Unmasked policies can still land on a visited slot; walk down
             # the ranking instead so each round investigates something new.
             decision = baseline_d_sequential(ranked, agent_type=decision.action.agent_type, visited=set(visited))
         target = decision.action.target_service
+        if target != ppo_pick:
+            log(f"  [round {step}] {ppo_pick} already investigated, falling back to {target}")
         visited.append(target)
         log(f"  [round {step}] re-investigating {target}")
         investigation = investigate(target, step)
