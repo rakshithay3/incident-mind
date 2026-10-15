@@ -6,7 +6,8 @@ export const TABS = [
   { id: 'timeline', label: 'Anomalies' },
   { id: 'rca', label: 'RCA' },
   { id: 'remediation', label: 'Agents' },
-  { id: 'evaluation', label: 'Evaluation', adminOnly: true }
+  { id: 'evaluation', label: 'Evaluation', adminOnly: true },
+  { id: 'inject', label: 'Fault injection', adminOnly: true }
 ]
 
 export default function TabNav({ activeTab, onChange, isAdmin = false }) {
