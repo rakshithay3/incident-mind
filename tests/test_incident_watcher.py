@@ -241,7 +241,8 @@ class ResultTest(unittest.TestCase):
         investigation = {"evidence_bundle": {"x": 1}, "report": {"root_cause_service": "auth-service"}}
         result = build_result("auto_1", "t", scores, scores, scores[:2], dispatch,
                               {"target_service": "auth-service", "fault_type": "cpu_stress"}, investigation)
-        self.assertTrue(read_keys - {"edges"} <= set(result), read_keys - set(result))
+        optional = {"edges", "fault_reports"}  # fault_reports: multi-fault runs only
+        self.assertTrue(read_keys - optional <= set(result), read_keys - set(result))
         self.assertEqual(set(result["ppo_dispatch"]), {"agent_type", "target_service", "policy_confidence"})
         self.assertEqual(set(result["nodes"][0]), {"service_id", "anomaly_score", "status", "rank"})
         self.assertEqual(result["metrics"]["pr_at_1"], 1.0)

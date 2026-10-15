@@ -398,12 +398,15 @@ def build_result(
     fault_injection_state: str = "resolved",
     detection: str = "graphsage",
     detection_info: Optional[dict] = None,
+    fault_reports: Optional[list] = None,
 ) -> dict:
     """ranked / raw_ranked / multi_fault_nodes are NodeScore-like objects
     (service_id, anomaly_score, status, rank); dispatch is
     {agent_type, target_service, policy_confidence}. detection is
     "graphsage" (learned model confirmed and ranked) or "gate-fallback"
-    (--fallback rule confirmed and ranked; see gate_ranking)."""
+    (--fallback rule confirmed and ranked; see gate_ranking). fault_reports
+    ([{service, score, report}], see multi_fault.investigate_faults) is only
+    added for a multi-fault incident."""
     ranking = "gate_fallback" if detection == "gate-fallback" else "graphsage_raw"
     truth = ground_truth["target_service"] if ground_truth else None
     if truth:
@@ -444,6 +447,8 @@ def build_result(
     }
     if detection_info:
         result["detection_info"] = detection_info
+    if fault_reports:
+        result["fault_reports"] = list(fault_reports)
     return result
 
 
@@ -512,7 +517,7 @@ def run_pipeline(incident_dir: Path, telemetry: dict, ground_truth: Optional[dic
     from incidentmind_p1.gnn_scorer import GraphSAGEScorer
     from incidentmind_p1.training import load_checkpoint
     from live_inject_and_capture import capture_logs
-    from multi_fault import detect_multi_fault
+    from multi_fault import detect_multi_fault, investigate_faults
     from notifications.rounds import notify_rounds_outcome, run_recovery_rounds
     from priority.impact_weights import PriorityWeightedScorer
     from stable_baselines3 import PPO
@@ -564,9 +569,12 @@ def run_pipeline(incident_dir: Path, telemetry: dict, ground_truth: Optional[dic
     publish(build_result(**common, fault_injection_state="active"))
     print(f"  {tag} interim result written to {args.output}; running agents...")
 
+    investigations: Dict[str, dict] = {}  # service -> agents' result, reused for per-fault reports
+
     def investigate(target: str) -> dict:
         inv = replay_demo.investigate_service(target, incident.incident_id, incident_dir, telemetry_path,
                                               args.code_repo_path)
+        investigations[target] = inv
         print(f"  {tag} report root cause: {inv['report'].get('root_cause_service')} "
               f"(confidence {inv['report'].get('confidence_score')})")
         return inv
@@ -597,9 +605,14 @@ def run_pipeline(incident_dir: Path, telemetry: dict, ground_truth: Optional[dic
             replay_demo._fault_started_at(telemetry), args.recovery_timeout,
         )
 
+    fault_reports = investigate_faults(common["multi_fault_nodes"], investigations, investigate)
+    if fault_reports:
+        print(f"  {tag} per-fault reports: " + ", ".join(
+            f"{fr['service']} -> {(fr['report'] or {}).get('root_cause_service')}" for fr in fault_reports))
+
     state = "active" if (recovery is not None and not recovery.get("recovered")) else "resolved"
     publish(build_result(**common, investigation=investigation, recovery=recovery, rounds=rounds,
-                         notifications=notifications, fault_injection_state=state))
+                         notifications=notifications, fault_injection_state=state, fault_reports=fault_reports))
     print(f"  {tag} final result written to {args.output} and {incident_dir / 'result.json'}")
 
 

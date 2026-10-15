@@ -5,6 +5,8 @@
 // Falls back to the rank-only wireframe when no report has been generated
 // yet for this incident (e.g. mock data, or a run where the Report Agent
 // hasn't finished).
+// On a multi-fault run, fault_reports adds one report per flagged service
+// below the PPO target's report.
 
 export default function RCAPanelTab({ incident }) {
   const ranked = [...incident.nodes].sort((a, b) => a.rank - b.rank).slice(0, 5)
@@ -75,6 +77,43 @@ export default function RCAPanelTab({ incident }) {
               </ul>
             </div>
           )}
+        </div>
+      )}
+
+      {incident.fault_reports?.length > 0 && (
+        <div className="rca-section fault-reports">
+          <span className="rca-section-label">
+            Per-fault reports ({incident.fault_reports.length} flagged services)
+          </span>
+          <ul className="fault-report-list">
+            {incident.fault_reports.map(fr => (
+              <li key={fr.service}>
+                <details>
+                  <summary>
+                    <span className="mono">{fr.service}</span>
+                    <span className="rca-score mono"> score {Number(fr.score).toFixed(2)}</span>
+                    {fr.report && (
+                      <span className="fault-report-cause mono">
+                        root cause {fr.report.root_cause_service}
+                        {fr.report.confidence_score != null &&
+                          ` · ${(fr.report.confidence_score * 100).toFixed(0)}%`}
+                      </span>
+                    )}
+                  </summary>
+                  {fr.report ? (
+                    <>
+                      <p className="rca-report-text">{fr.report.report_text?.en ?? 'No report text.'}</p>
+                      {fr.report.suggested_fix && (
+                        <p className="fault-report-fix"><strong>Suggested fix:</strong> {fr.report.suggested_fix}</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="rca-report-text">No report for this service.</p>
+                  )}
+                </details>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

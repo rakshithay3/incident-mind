@@ -47,7 +47,7 @@ from incidentmind_p1.dispatch import PPODispatcher
 from incidentmind_p1.gnn_scorer import GraphSAGEScorer
 from incidentmind_p1.training import load_checkpoint
 from priority.impact_weights import PriorityWeightedScorer
-from multi_fault import detect_multi_fault
+from multi_fault import detect_multi_fault, investigate_faults
 from notifications.notifier import Notifier
 from notifications.recipients import get_recipients
 from notifications.recovery import wait_for_recovery
@@ -252,8 +252,14 @@ def main() -> None:
         print(f"  Note: PPO dispatched to {top_service}, true root cause is {telemetry['target_service']}.")
 
     print("[4/6] Running live investigation (Ollama agents + report) using REAL captured evidence...")
-    investigation = investigate_service(top_service, incident.incident_id, incident_dir, telemetry_path,
-                                        args.code_repo_path)
+    investigations = {}  # service -> agents' result, reused for per-fault reports
+
+    def investigate(target):
+        investigations[target] = investigate_service(target, incident.incident_id, incident_dir, telemetry_path,
+                                                     args.code_repo_path)
+        return investigations[target]
+
+    investigation = investigate(top_service)
 
     print(f"  Root cause identified: {investigation['report']['root_cause_service']}")
     print(f"  Confidence: {investigation['report']['confidence_score']}")
@@ -268,8 +274,7 @@ def main() -> None:
             rescore=lambda r: rescore_snapshot(fresh_snapshot(telemetry, args.simulate_recovery, r),
                                                telemetry, base_scorer),
             choose=lambda rk, visited, step: dispatcher.choose(rk, visited=visited, step=step),
-            investigate=lambda target, r: investigate_service(target, incident.incident_id, incident_dir,
-                                                              telemetry_path, args.code_repo_path),
+            investigate=lambda target, r: investigate(target),
             max_rounds=args.max_rounds,
         )
         recovery, rounds, investigation = outcome["recovery"], outcome["rounds"], outcome["investigation"]
@@ -280,6 +285,12 @@ def main() -> None:
             notifier, incident.incident_id, outcome, get_recipients,
             _fault_started_at(telemetry), args.recovery_timeout,
         )
+
+    fault_reports = investigate_faults(multi_fault_nodes, investigations, investigate)
+    if fault_reports:
+        print(f"  Per-fault reports for {len(fault_reports)} flagged services:")
+        for fr in fault_reports:
+            print(f"    -> {fr['service']}: root cause {(fr['report'] or {}).get('root_cause_service')}")
 
     print("[6/6] Saving result...")
     result = {
@@ -317,6 +328,8 @@ def main() -> None:
             "ranking": "graphsage_raw",
         },
     }
+    if fault_reports:
+        result["fault_reports"] = fault_reports
     with open(args.output, "w") as f:
         json.dump(result, f, indent=2)
     print(f"Saved to {args.output}")

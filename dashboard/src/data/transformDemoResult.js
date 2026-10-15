@@ -30,6 +30,9 @@ export function transformDemoResult(raw) {
     metrics: raw.metrics ?? { pr_at_1: 0, pr_at_3: 0, pr_at_5: 0 },
     ppo_dispatch: normalizeDispatch(raw.ppo_dispatch),
     multi_fault_detected: raw.multi_fault_detected ?? [],
+    // One RCA report per flagged service, only on multi-fault runs:
+    // [{service, score, report}] (multi_fault.investigate_faults).
+    fault_reports: Array.isArray(raw.fault_reports) ? raw.fault_reports : [],
     evidence_bundle: raw.evidence_bundle ?? null,
     report: raw.report ?? null,
     // Recovery check + "ShopMind is back" user email (notifications/).
