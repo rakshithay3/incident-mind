@@ -28,7 +28,7 @@ export default function SummaryStrip({ incident }) {
           {confidence ?? (dispatch ? `PPO sent ${dispatch.agent_type} agent · report pending` : 'no report yet')}
         </div>
         {multiRound && (
-          <div className="stat-sub">
+          <div className="stat-sub stat-sub-wrap">
             Round {rounds[rounds.length - 1].round ?? rounds.length} of {rounds.length} · Round 1 picked{' '}
             <span className="mono">{rounds[0].target_service}</span> ({roundOutcome(rounds[0].recovery).replace('_', ' ')})
           </div>
