@@ -1383,16 +1383,23 @@
         /* Auth Tabs in Modal */
         .auth-tabs {
             display: flex;
+            flex-wrap: wrap;
             border-bottom: 1px solid var(--border);
             margin-bottom: 1.2rem;
             gap: 0.5rem;
         }
 
+        .admin-only { display: none; }
+        body.is-admin .admin-only { display: block; }
+        /* Users get a plain storefront: no sidebar column at all. */
+        body:not(.is-admin) .sidebar { display: none; }
+        body:not(.is-admin) main { grid-template-columns: 1fr; }
+
         .auth-tab-btn {
             background: none;
             border: none;
             color: var(--text-muted);
-            padding: 0.6rem 0.8rem;
+            padding: 0.6rem 0.6rem;
             font-size: 0.85rem;
             font-weight: 700;
             cursor: pointer;
@@ -1667,8 +1674,8 @@
 
         <!-- Right Sidebar: Chaos Switch & Telemetry Terminal -->
         <aside class="sidebar">
-            <!-- Chaos Injection Panel -->
-            <div class="side-card">
+            <!-- Chaos Injection Panel (admin interface only) -->
+            <div class="side-card admin-only" id="admin-chaos-card">
                 <div class="side-card-title">
                     <span>⚡ Live Chaos Injector</span>
                 </div>
@@ -1709,8 +1716,8 @@
                 </button>
             </div>
 
-            <!-- Real-Time Telemetry Terminal -->
-            <div class="side-card">
+            <!-- Real-Time Telemetry Terminal (admin interface only) -->
+            <div class="side-card admin-only" id="admin-telemetry-card">
                 <div class="side-card-title">
                     <span>📡 Inter-Service Telemetry Bus</span>
                 </div>
@@ -1796,13 +1803,14 @@
                 <button class="auth-tab-btn active" id="tab-btn-signin" onclick="switchAuthTab('signin')">🔑 Sign In</button>
                 <button class="auth-tab-btn" id="tab-btn-register" onclick="switchAuthTab('register')">✨ Register</button>
                 <button class="auth-tab-btn" id="tab-btn-guest" onclick="switchAuthTab('guest')">⚡ Guest Mode</button>
+                <button class="auth-tab-btn" id="tab-btn-admin" onclick="switchAuthTab('admin')">🛡️ Admin</button>
             </div>
 
             <!-- Sign In Tab -->
             <div id="auth-tab-signin-content">
                 <div class="form-group">
                     <label>Username</label>
-                    <input type="text" id="login-username" placeholder="e.g. admin or archie">
+                    <input type="text" id="login-username" placeholder="e.g. archie or demo">
                 </div>
                 <div class="form-group">
                     <label>Password</label>
@@ -1811,7 +1819,6 @@
 
                 <div style="font-size: 0.72rem; color: var(--text-dim); margin-bottom: 0.35rem;">1-Click Quick Demo Sign In:</div>
                 <div class="quick-logins">
-                    <button type="button" class="quick-btn" onclick="quickLogin('admin', 'admin')">⚡ Admin (admin)</button>
                     <button type="button" class="quick-btn" onclick="quickLogin('archie', 'password123')">⚡ Archie (archie)</button>
                     <button type="button" class="quick-btn" onclick="quickLogin('demo', 'demo')">⚡ Demo Shopper</button>
                 </div>
@@ -1838,6 +1845,22 @@
                     <input type="password" id="reg-password" placeholder="••••••••">
                 </div>
                 <button class="modal-btn" onclick="submitRegister()" style="margin-top: 0.6rem;">Create New Account</button>
+            </div>
+
+            <!-- Admin Tab: separate admin login (unlocks the chaos / fault-injection panel) -->
+            <div id="auth-tab-admin-content" style="display: none;">
+                <div style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1rem;">
+                    Administrator sign-in. Admins get the live chaos injector; shopper accounts do not.
+                </div>
+                <div class="form-group">
+                    <label>Admin Username</label>
+                    <input type="text" id="admin-username" placeholder="admin" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label>Admin Password</label>
+                    <input type="password" id="admin-password" placeholder="••••••••" autocomplete="current-password">
+                </div>
+                <button class="modal-btn" onclick="submitAdminLogin()" style="margin-top: 0.6rem;">Sign In as Admin</button>
             </div>
 
             <!-- Guest Mode Tab -->
@@ -1959,6 +1982,9 @@
             dropRole.innerText = (currentUser.role || 'MEMBER').toUpperCase();
             dropRole.className = 'user-role-pill ' + (isGuest ? 'role-guest' : (currentUser.role === 'admin' ? 'role-admin' : 'role-member'));
             drawerUser.innerText = `Orders for: ${currentUser.name}`;
+
+            // Two interfaces on one page: only an admin session sees the chaos injector.
+            document.body.classList.toggle('is-admin', currentUser.role === 'admin');
         };
 
         const toggleUserDropdown = (forceState) => {
@@ -1990,7 +2016,7 @@
         };
 
         const switchAuthTab = (tab) => {
-            const tabs = ['signin', 'register', 'guest'];
+            const tabs = ['signin', 'register', 'guest', 'admin'];
             tabs.forEach(t => {
                 const btn = document.getElementById(`tab-btn-${t}`);
                 const content = document.getElementById(`auth-tab-${t}-content`);
@@ -2004,10 +2030,9 @@
             });
         };
 
-        // Submit Sign In
-        const submitLogin = async () => {
-            const username = document.getElementById('login-username').value.trim();
-            const password = document.getElementById('login-password').value.trim();
+        // Shared sign-in. asAdmin=true is the Admin tab (accepts only admin accounts);
+        // the normal Sign In tab refuses admin accounts so the two logins stay separate.
+        const doLogin = async (username, password, asAdmin) => {
             if (!username || !password) {
                 showToast('Please enter both username and password', '⚠️');
                 return;
@@ -2022,11 +2047,15 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Login failed');
 
+                const isAdminAccount = data.user.role === 'admin';
+                if (asAdmin && !isAdminAccount) throw new Error('This account is not an administrator');
+                if (!asAdmin && isAdminAccount) throw new Error('Administrators sign in from the Admin tab');
+
                 currentUser = data.user;
                 localStorage.setItem('shopmind_user', JSON.stringify(currentUser));
                 updateUserUI();
                 closeAuthModal();
-                showToast(`Welcome back, ${currentUser.name}!`, '👋');
+                showToast(asAdmin ? `Admin console unlocked, ${currentUser.name}` : `Welcome back, ${currentUser.name}!`, asAdmin ? '🛡️' : '👋');
                 logTerminal(`[AUTH] Logged in as ${currentUser.username} (${currentUser.role})`, 'var(--success)');
                 fetchUserOrders();
             } catch (err) {
@@ -2034,6 +2063,18 @@
                 logTerminal(`[AUTH ERROR] ${err.message}`, 'var(--danger)');
             }
         };
+
+        const submitLogin = () => doLogin(
+            document.getElementById('login-username').value.trim(),
+            document.getElementById('login-password').value.trim(),
+            false
+        );
+
+        const submitAdminLogin = () => doLogin(
+            document.getElementById('admin-username').value.trim(),
+            document.getElementById('admin-password').value.trim(),
+            true
+        );
 
         // Quick demo login
         const quickLogin = (u, p) => {
@@ -2620,6 +2661,10 @@
 
         // Chaos Injection Trigger
         const injectChaos = async () => {
+            if (!currentUser || currentUser.role !== 'admin') {
+                showToast('Fault injection is admin-only', '🔒');
+                return;
+            }
             const service = document.getElementById('target-service').value;
             const type = document.getElementById('fault-type').value;
             const duration = parseInt(document.getElementById('duration').value);
