@@ -11,8 +11,6 @@ import RCAPanelTab from './components/tabs/RCAPanelTab'
 import RemediationLogTab from './components/tabs/RemediationLogTab'
 import EvaluationTab from './components/tabs/EvaluationTab'
 import PriorityQueueTab from './components/tabs/PriorityQueueTab'
-import LoginScreen from './components/LoginScreen'
-import { loadSession, saveSession } from './data/auth'
 import { useIncidentData } from './hooks/useIncidentData'
 import { useMultiInstanceData } from './hooks/useMultiInstanceData'
 
@@ -45,11 +43,7 @@ function useTheme() {
   return [theme, toggle]
 }
 
-// Two roles share this page. Anything about fault injection (the beacon, the
-// live-demo switch, fault types, scripted-recovery badges, the evaluation
-// benchmark) is admin-only; the user role sees service health, alerts and RCA.
-function Dashboard({ session, onLogout }) {
-  const isAdmin = session.role === 'admin'
+export default function App() {
   const [activeTab, setActiveTab] = useState('alerts')
   const [theme, toggleTheme] = useTheme()
   const { incident, isLive, liveDemoMode, setLiveDemo, refreshMs } = useIncidentData()
@@ -70,16 +64,13 @@ function Dashboard({ session, onLogout }) {
         <div className="header-controls">
           <span className={`source-pill ${isLive ? 'source-live' : ''}`}>
             <span className="source-dot" />
-            {isLive ? 'Live result' : 'Mock data'}
-            {isAdmin && <> · every {liveDemoMode ? '2s' : '5 min'}</>}
+            {isLive ? 'Live result' : 'Mock data'} · every {liveDemoMode ? '2s' : '5 min'}
           </span>
-          {isAdmin && (
-            <label className="switch">
-              <input type="checkbox" checked={liveDemoMode} onChange={e => setLiveDemo(e.target.checked)} />
-              <span className="switch-track" />
-              <span className="switch-text">Live demo</span>
-            </label>
-          )}
+          <label className="switch">
+            <input type="checkbox" checked={liveDemoMode} onChange={e => setLiveDemo(e.target.checked)} />
+            <span className="switch-track" />
+            <span className="switch-text">Live demo</span>
+          </label>
           <button
             className="icon-btn"
             onClick={toggleTheme}
@@ -88,17 +79,11 @@ function Dashboard({ session, onLogout }) {
           >
             {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
           </button>
-          {isAdmin && (
-            <FaultBeacon state={incident.fault_injection_state} simulated={incident.recovery?.simulated} />
-          )}
-          <span className={`role-badge ${isAdmin ? 'role-badge-admin' : ''}`} title={`Signed in as ${session.username}`}>
-            {session.display}
-          </span>
-          <button className="signout-btn" onClick={onLogout}>Sign out</button>
+          <FaultBeacon state={incident.fault_injection_state} simulated={incident.recovery?.simulated} />
         </div>
       </header>
 
-      <SummaryStrip incident={incident} isAdmin={isAdmin} />
+      <SummaryStrip incident={incident} />
 
       <main className="app-main">
         <section className="graph-section">
@@ -116,28 +101,11 @@ function Dashboard({ session, onLogout }) {
 
         <section className="tabs-section">
           <div className="tabs-card">
-            <TabNav activeTab={activeTab} onChange={setActiveTab} isAdmin={isAdmin} />
-            <ActiveTabComponent incident={incident} multiInstance={multiInstance} isAdmin={isAdmin} />
+            <TabNav activeTab={activeTab} onChange={setActiveTab} />
+            <ActiveTabComponent incident={incident} multiInstance={multiInstance} />
           </div>
         </section>
       </main>
     </div>
   )
-}
-
-export default function App() {
-  const [session, setSession] = useState(loadSession)
-
-  const login = useCallback(s => {
-    saveSession(s)
-    setSession(s)
-  }, [])
-  const logout = useCallback(() => {
-    saveSession(null)
-    setSession(null)
-  }, [])
-
-  if (!session) return <LoginScreen onLogin={login} />
-  // key resets tab/poll state when switching accounts
-  return <Dashboard key={session.role} session={session} onLogout={logout} />
 }

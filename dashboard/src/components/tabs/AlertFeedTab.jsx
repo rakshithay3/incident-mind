@@ -4,14 +4,14 @@ import CustomerNotification from '../CustomerNotification'
 // Real-time alert streaming arrives once Archie's Prometheus/Jaeger exports
 // are live.
 
-export default function AlertFeedTab({ incident, isAdmin = false }) {
+export default function AlertFeedTab({ incident }) {
   const anomalous = [...incident.nodes]
     .filter(n => n.status === 'anomalous')
     .sort((a, b) => a.rank - b.rank)
 
   return (
     <div className="tab-panel">
-      <CustomerNotification incident={incident} isAdmin={isAdmin} />
+      <CustomerNotification incident={incident} />
       <span className="section-label">Active alerts</span>
       <ul className="alert-list">
         {anomalous.map(n => (
