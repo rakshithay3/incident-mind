@@ -4,15 +4,6 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
-    proxy: {
-      // Admin fault injection -> ShopMind api-gateway (docker-compose, port 80).
-      // Proxying avoids CORS: the services send no CORS headers.
-      '/shopmind-api': {
-        target: 'http://localhost:80',
-        changeOrigin: true,
-        rewrite: path => path.replace(/^\/shopmind-api/, '')
-      }
-    }
+    port: 5173
   }
 })

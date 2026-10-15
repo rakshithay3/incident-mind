@@ -11,7 +11,6 @@ import RCAPanelTab from './components/tabs/RCAPanelTab'
 import RemediationLogTab from './components/tabs/RemediationLogTab'
 import EvaluationTab from './components/tabs/EvaluationTab'
 import PriorityQueueTab from './components/tabs/PriorityQueueTab'
-import FaultInjectionTab from './components/tabs/FaultInjectionTab'
 import LoginScreen from './components/LoginScreen'
 import { loadSession, saveSession } from './data/auth'
 import { useIncidentData } from './hooks/useIncidentData'
@@ -23,8 +22,7 @@ const TAB_COMPONENTS = {
   timeline: AnomalyTimelineTab,
   rca: RCAPanelTab,
   remediation: RemediationLogTab,
-  evaluation: EvaluationTab,
-  inject: FaultInjectionTab
+  evaluation: EvaluationTab
 }
 
 function useTheme() {
