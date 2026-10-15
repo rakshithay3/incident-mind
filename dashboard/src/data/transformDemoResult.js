@@ -35,6 +35,9 @@ export function transformDemoResult(raw) {
     // Recovery check + "ShopMind is back" user email (notifications/).
     // Missing on runs made before those existed, or with --no-notify.
     recovery: raw.recovery ?? null,
+    // One entry per investigation round: {round, target_service,
+    // report_root_cause, recovery} (notifications/rounds.py).
+    rounds: Array.isArray(raw.rounds) ? raw.rounds : [],
     notifications: Array.isArray(raw.notifications) ? raw.notifications : []
   }
 }

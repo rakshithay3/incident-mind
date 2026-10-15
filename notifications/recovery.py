@@ -31,13 +31,13 @@ from typing import Callable, Dict, Iterable, List, Optional, Tuple
 FIELDS = ("cpu_pct", "mem_pct", "error_rate", "p99_latency_ms")
 
 
-def baseline_means(baseline_history: Iterable[Dict]) -> Dict[str, Dict[str, float]]:
+def baseline_means(baseline_history: Iterable[Dict], fields: Iterable[str] = FIELDS) -> Dict[str, Dict[str, float]]:
     sums: Dict[Tuple[str, str], float] = {}
     counts: Dict[Tuple[str, str], int] = {}
     for snap in baseline_history or []:
         for node in snap.get("nodes", []):
             sid = node.get("service_id")
-            for f in FIELDS:
+            for f in fields:
                 v = node.get(f)
                 if v is not None:
                     sums[(sid, f)] = sums.get((sid, f), 0.0) + float(v)

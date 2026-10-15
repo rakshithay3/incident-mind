@@ -61,7 +61,7 @@ cp multi_instance_result.json dashboard/public/multiInstanceResult.json
 
 ## User notifications
 
-After the RCA, `replay_demo.py` polls live ShopMind telemetry until every app service is back near its pre-fault baseline for 3 polls in a row, then emails every registered ShopMind user a short plain-language "we're back to normal" message (no RCA details). Guests and placeholder addresses (`@shopmind.io`, `@example.com`) are skipped, so register on ShopMind with a real email for a demo. If ShopMind isn't back within `--recovery-timeout` (default 180s), nobody is emailed.
+After the RCA, `replay_demo.py` polls live ShopMind telemetry until every app service is back near its pre-fault baseline for 3 polls in a row, then emails every registered ShopMind user a short plain-language "we're back to normal" message (no RCA details). Guests and placeholder addresses (`@shopmind.io`, `@example.com`) are skipped, so register on ShopMind with a real email for a demo. If ShopMind isn't back within `--recovery-timeout` (default 180s), nobody is emailed. Instead the pipeline re-investigates: it re-scores a fresh telemetry snapshot with GraphSAGE, PPO picks a service not yet investigated, the agents write a new report and recovery is polled again, for up to `--max-rounds` rounds (default 3). The email goes out only when a round recovers; each round is listed under `rounds` in the result JSON. `--simulate-recovery recovers_round2` plays a run where round 1 relapses and round 2 recovers.
 
 Set `IM_SMTP_USER` and `IM_SMTP_PASSWORD` (Gmail app password). Without them the emails are written to `output/notifications/` instead of sent. `--no-notify` skips the wait and the email.
 

@@ -33,6 +33,32 @@ export function fmtDuration(sec) {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m`
 }
 
+function roundOutcome(recovery) {
+  if (!recovery) return 'unknown'
+  return recovery.recovered ? 'recovered' : (recovery.outcome ?? 'not_recovered')
+}
+
+// Re-investigation rounds: round 1 -> auth-service -> relapsed, ...
+function RecoveryRounds({ rounds }) {
+  if (!rounds || rounds.length < 2) return null
+  return (
+    <ol className="notice-rounds">
+      {rounds.map(r => {
+        const out = roundOutcome(r.recovery)
+        return (
+          <li key={r.round}>
+            <span className="round-no">Round {r.round}</span>
+            <span className="round-arrow">→</span>
+            <strong>{r.target_service}</strong>
+            <span className="round-arrow">→</span>
+            <span className={`round-outcome ${out === 'recovered' ? 'ok' : 'bad'}`}>{out.replace('_', ' ')}</span>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
 export function notifySummary(incident) {
   const n = restoredNotification(incident)
   if (!n) return { label: 'No email data', cls: 'none', sub: 'run predates user emails or --no-notify' }
@@ -85,11 +111,13 @@ export default function CustomerNotification({ incident }) {
           <span className={`status-pill notify-${s.cls}`}>{s.label}</span>
         </div>
         <div className="notice-body">{body}</div>
+        <RecoveryRounds rounds={incident.rounds} />
         <div className="notice-meta">
           {restored && <span>Back to normal <strong>{restored}</strong></span>}
           {outcome && <span>Outcome <strong>{outcome}</strong></span>}
           {downtime && <span>Disruption <strong>{downtime}</strong></span>}
           {recovery?.polls != null && <span>Health checks <strong>{recovery.polls}</strong></span>}
+          {incident.rounds?.length > 1 && <span>Rounds <strong>{incident.rounds.length}</strong></span>}
           {d.recipients_source && <span>Users from <strong>{d.recipients_source}</strong></span>}
           {recovery?.simulated && <span className="status-pill notify-skipped" title={`Scripted recovery scenario: ${recovery.simulated}`}>Simulated</span>}
         </div>

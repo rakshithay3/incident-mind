@@ -320,6 +320,13 @@ button { font-family: inherit; }
 .notice-body { font-size: 13px; color: var(--text-2); margin-top: 3px; }
 .notice-meta { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--text-3); }
 .notice-meta strong { color: var(--text); font-weight: 550; }
+.notice-rounds { list-style: none; padding: 0; margin: 8px 0 0; font-size: 12px; color: var(--text-2); }
+.notice-rounds li { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 2px 0; }
+.notice-rounds strong { color: var(--text); font-weight: 550; }
+.round-no { color: var(--text-3); min-width: 56px; }
+.round-arrow { color: var(--text-3); }
+.round-outcome.ok { color: var(--ok); }
+.round-outcome.bad { color: var(--danger); }
 
 /* --- RCA panel ---------------------------------------------------------- */
 .rca-list { list-style: none; padding: 0; margin: 0 0 4px; }

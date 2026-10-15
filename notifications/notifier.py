@@ -222,9 +222,15 @@ class Notifier:
         reason = f"{len(errors)} message(s) failed" if errors else None
         return self._record(incident_id, status, details, len(messages), sent, reason=reason)
 
-    def notify_not_recovered(self, incident_id: str, still_unhealthy: List[str], waited_sec: float) -> Dict[str, Any]:
-        return self._record(incident_id, "skipped", {"still_unhealthy": still_unhealthy}, 0, 0,
-                            reason=f"ShopMind not back to normal after {int(waited_sec)}s, users not emailed")
+    def notify_not_recovered(self, incident_id: str, still_unhealthy: List[str], waited_sec: float,
+                             services_tried: Optional[List[str]] = None) -> Dict[str, Any]:
+        details: Dict[str, Any] = {"still_unhealthy": still_unhealthy}
+        reason = f"ShopMind not back to normal after {int(waited_sec)}s, users not emailed"
+        if services_tried:
+            details["services_tried"] = list(services_tried)
+            reason = (f"ShopMind not back to normal after {int(waited_sec)}s "
+                      f"(investigated {', '.join(services_tried)}), users not emailed")
+        return self._record(incident_id, "skipped", details, 0, 0, reason=reason)
 
     # ------------------------------------------------------------------
 

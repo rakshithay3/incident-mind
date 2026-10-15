@@ -27,6 +27,7 @@ EXPECTED = {
     "telemetry": (False, "not_recovered", TIMEOUT_POLLS, ["telemetry error: ConnectionError"]),
     "late": (False, "not_recovered", TIMEOUT_POLLS, ["auth-service", "order-service"]),
     "recovers": (True, "recovered", 1 + CONSECUTIVE, []),
+    "recovers_round2": (False, "relapsed", TIMEOUT_POLLS, ["auth-service"]),  # round 1 plays "relapse"
 }
 NEGATIVE = [s for s in SCENARIOS if s != "recovers"]
 

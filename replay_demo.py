@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from incidentmind_p1.contracts import IncidentGraph
@@ -50,7 +51,8 @@ from multi_fault import detect_multi_fault
 from notifications.notifier import Notifier
 from notifications.recipients import get_recipients
 from notifications.recovery import wait_for_recovery
-from notifications.recovery_sim import SCENARIOS, simulate_recovery
+from notifications.recovery_sim import SCENARIOS, simulate_recovery, simulated_snapshot
+from notifications.rounds import notify_rounds_outcome, run_recovery_rounds
 
 # Snapshot selection, crash encoding, unit conversion and edges come from
 # shopmind_snapshot.py -- the SAME label-free code that builds the
@@ -82,19 +84,24 @@ def _fault_started_at(telemetry):
     if not failure:
         return None
     first = failure[0]
-    return first.get("timestamp") or next(
+    ts = first.get("timestamp") or next(
         (n.get("timestamp") for n in first.get("nodes", []) if n.get("timestamp")), None
     )
+    if isinstance(ts, (int, float)):  # some captures store snapshot time as epoch seconds
+        ts = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat(timespec="seconds")
+    return ts
 
 
-def _wait_for_shopmind(telemetry, timeout_sec, interval_sec, simulate=None):
+def _wait_for_shopmind(telemetry, timeout_sec, interval_sec, simulate=None, round_no=1):
     """Poll live ShopMind telemetry until it's back near this incident's
     baseline. If ShopMind/export_metrics isn't available at all, report
     not-recovered rather than guessing -- users are only told it's fixed
     when telemetry actually shows it. simulate=<scenario> replays a scripted
-    trajectory (notifications/recovery_sim.py) instead of live telemetry."""
+    trajectory (notifications/recovery_sim.py) instead of live telemetry;
+    round_no is the re-investigation round it should play."""
     if simulate:
-        return simulate_recovery(simulate, telemetry, timeout_sec=timeout_sec, interval_sec=interval_sec)
+        return simulate_recovery(simulate, telemetry, timeout_sec=timeout_sec, interval_sec=interval_sec,
+                                 round_no=round_no)
     try:
         from export_metrics import collect_all_telemetry, load_services
         config = load_services()
@@ -114,6 +121,58 @@ def _wait_for_shopmind(telemetry, timeout_sec, interval_sec, simulate=None):
     )
 
 
+def fresh_snapshot(telemetry, simulate=None, round_no=1):
+    """One current telemetry snapshot {"timestamp", "nodes", "edges"} for
+    re-scoring after a failed recovery round: the live collector, or the
+    scripted one for --simulate-recovery. None if telemetry is unavailable."""
+    if simulate:
+        return simulated_snapshot(simulate, telemetry, round_no=round_no)
+    try:
+        from export_metrics import collect_all_telemetry, load_services
+        nodes, edges = collect_all_telemetry(load_services(), 10)
+    except (ImportError, SystemExit, Exception) as exc:
+        print(f"  [re-score] live telemetry unavailable ({type(exc).__name__}), keeping the previous ranking")
+        return None
+    return {"timestamp": nodes[0].get("timestamp", "") if nodes else "", "nodes": nodes, "edges": edges}
+
+
+def rescore_snapshot(snapshot, telemetry, base_scorer):
+    """Score a fresh snapshot against this incident's baseline with
+    GraphSAGE (+ priority re-ranking, as for the first dispatch)."""
+    if not snapshot or not snapshot.get("nodes"):
+        return None
+    payload = compile_telemetry({
+        "incident_id": telemetry.get("incident_id"),
+        "baseline_history": telemetry.get("baseline_history", []),
+        "failure_history": [snapshot],
+    })
+    if payload is None:
+        return None
+    graph = payload_to_graph(payload, source="rescore")
+    return sorted(PriorityWeightedScorer(base_scorer).score_graph(graph), key=lambda s: s.rank)
+
+
+def investigate_service(target, incident_id, incident_dir, telemetry_path, code_path):
+    """Run the log/metrics/code agents + report on one target service."""
+    from schemas.contracts import DispatchAction
+    from pipeline import run_investigation
+
+    # run_investigation -> pipeline.investigate_incident -> pipeline.dispatch
+    # passes telemetry_path/log_path/code_path through to each agent's
+    # investigate(). Code Agent uses code_path (repo_path), not
+    # telemetry_path/log_path -- all three are separate pipeline.py params.
+    log_path = Path(incident_dir) / f"{target}.log"
+    if not log_path.exists():
+        print(f"  WARNING: no log file found at {log_path} -- Log Agent will fall back to static sample_data/logs.txt")
+    return run_investigation(
+        [DispatchAction(agent_type=a, target_service=target) for a in ("log", "metrics", "code")],
+        incident_id=incident_id,
+        telemetry_path=str(telemetry_path),
+        log_path=str(log_path) if log_path.exists() else None,
+        code_path=code_path,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Replay a real ShopMind incident through the full live pipeline")
     parser.add_argument("--incident-dir", required=True, help="Directory with telemetry_series.json + service logs")
@@ -128,6 +187,8 @@ def main() -> None:
     parser.add_argument("--recovery-interval", type=float, default=5.0)
     parser.add_argument("--simulate-recovery", choices=SCENARIOS, default=None,
                         help="Replace live recovery polling with a scripted trajectory (only with notifications on)")
+    parser.add_argument("--max-rounds", type=int, default=3,
+                        help="Investigation rounds (re-score + PPO picks a new target) while recovery keeps failing")
     args = parser.parse_args()
 
     notifier = None if args.no_notify else Notifier()
@@ -177,7 +238,9 @@ def main() -> None:
     from stable_baselines3 import PPO
 
     policy = PPO.load(args.ppo_model)
-    dispatcher = PPODispatcher(policy=policy)
+    # mask_visited only matters for re-investigation rounds; with nothing
+    # visited it is identical to the unmasked first dispatch.
+    dispatcher = PPODispatcher(policy=policy, mask_visited=True)
     decision = dispatcher.choose(ranked, visited=set(), step=1)
     top_service = decision.action.target_service
     print(f"  PPO dispatch: agent={decision.action.agent_type} target={top_service} confidence={decision.policy_confidence:.2f}")
@@ -187,55 +250,34 @@ def main() -> None:
         print(f"  Note: PPO dispatched to {top_service}, true root cause is {telemetry['target_service']}.")
 
     print("[4/6] Running live investigation (Ollama agents + report) using REAL captured evidence...")
-    from schemas.contracts import DispatchAction
-    from pipeline import run_investigation
-
-    log_path = incident_dir / f"{top_service}.log"
-    actions = [
-        DispatchAction(agent_type="log", target_service=top_service),
-        DispatchAction(agent_type="metrics", target_service=top_service),
-        DispatchAction(agent_type="code", target_service=top_service),
-    ]
-
-    # run_investigation -> pipeline.investigate_incident -> pipeline.dispatch
-    # passes telemetry_path/log_path/code_path through to each agent's
-    # investigate(). Code Agent uses code_path (repo_path), not
-    # telemetry_path/log_path -- all three are separate pipeline.py params.
-    if not log_path.exists():
-        print(f"  WARNING: no log file found at {log_path} -- Log Agent will fall back to static sample_data/logs.txt")
-
-    investigation = run_investigation(
-        actions,
-        incident_id=incident.incident_id,
-        telemetry_path=str(telemetry_path),
-        log_path=str(log_path) if log_path.exists() else None,
-        code_path=args.code_repo_path,
-    )
+    investigation = investigate_service(top_service, incident.incident_id, incident_dir, telemetry_path,
+                                        args.code_repo_path)
 
     print(f"  Root cause identified: {investigation['report']['root_cause_service']}")
     print(f"  Confidence: {investigation['report']['confidence_score']}")
 
-    notifications, recovery = [], None
+    notifications, recovery, rounds = [], None, []
     if notifier is not None:
         print("[5/6] Waiting for ShopMind to return to normal before emailing users...")
-        recovery = _wait_for_shopmind(telemetry, args.recovery_timeout, args.recovery_interval,
-                                      simulate=args.simulate_recovery)
-        if recovery["recovered"]:
-            reported = investigation["report"].get("root_cause_service")
-            affected = reported if reported and reported != "unknown" else top_service
-            fresh = get_recipients()  # pick up anyone who registered meanwhile
-            notifications.append(notifier.notify_restored(
-                incident.incident_id,
-                fresh["recipients"],
-                root_cause_service=affected,
-                started_at=_fault_started_at(telemetry),
-                restored_at=recovery["restored_at"],
-                recipients_source=fresh["source"],
-            ))
-        else:
-            notifications.append(notifier.notify_not_recovered(
-                incident.incident_id, recovery["still_unhealthy"], args.recovery_timeout
-            ))
+        outcome = run_recovery_rounds(
+            top_service, investigation, ranked,
+            wait=lambda r: _wait_for_shopmind(telemetry, args.recovery_timeout, args.recovery_interval,
+                                              simulate=args.simulate_recovery, round_no=r),
+            rescore=lambda r: rescore_snapshot(fresh_snapshot(telemetry, args.simulate_recovery, r),
+                                               telemetry, base_scorer),
+            choose=lambda rk, visited, step: dispatcher.choose(rk, visited=visited, step=step),
+            investigate=lambda target, r: investigate_service(target, incident.incident_id, incident_dir,
+                                                              telemetry_path, args.code_repo_path),
+            max_rounds=args.max_rounds,
+        )
+        recovery, rounds, investigation = outcome["recovery"], outcome["rounds"], outcome["investigation"]
+        if outcome["decision"] is not None:
+            decision, ranked = outcome["decision"], outcome["ranked"]
+            multi_fault_nodes = detect_multi_fault(ranked)
+        notifications = notify_rounds_outcome(
+            notifier, incident.incident_id, outcome, get_recipients,
+            _fault_started_at(telemetry), args.recovery_timeout,
+        )
 
     print("[6/6] Saving result...")
     result = {
@@ -264,6 +306,7 @@ def main() -> None:
         "evidence_bundle": investigation["evidence_bundle"],
         "report": investigation["report"],
         "recovery": recovery,
+        "rounds": rounds,
         "notifications": notifications,
         "metrics": {
             "pr_at_1": 1.0 if raw_ranked[0].service_id == telemetry["target_service"] else 0.0,

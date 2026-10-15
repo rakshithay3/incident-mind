@@ -394,6 +394,7 @@ def build_result(
     investigation: Optional[dict] = None,
     recovery: Optional[dict] = None,
     notifications: Optional[list] = None,
+    rounds: Optional[list] = None,
     fault_injection_state: str = "resolved",
     detection: str = "graphsage",
     detection_info: Optional[dict] = None,
@@ -435,6 +436,7 @@ def build_result(
         "evidence_bundle": (investigation or {}).get("evidence_bundle"),
         "report": (investigation or {}).get("report"),
         "recovery": recovery,
+        "rounds": list(rounds or []),
         "notifications": list(notifications or []),
         "metrics": metrics,
         "ground_truth": "fault-status" if truth else "unavailable",
@@ -511,6 +513,7 @@ def run_pipeline(incident_dir: Path, telemetry: dict, ground_truth: Optional[dic
     from incidentmind_p1.training import load_checkpoint
     from live_inject_and_capture import capture_logs
     from multi_fault import detect_multi_fault
+    from notifications.rounds import notify_rounds_outcome, run_recovery_rounds
     from priority.impact_weights import PriorityWeightedScorer
     from stable_baselines3 import PPO
 
@@ -528,18 +531,19 @@ def run_pipeline(incident_dir: Path, telemetry: dict, ground_truth: Optional[dic
 
     incident = replay_demo.compile_live_snapshot(telemetry)
     detection = telemetry.get("detection", "graphsage")
+    encoder, stats = load_checkpoint(args.graphsage_model)
+    base_scorer = GraphSAGEScorer(encoder, stats)  # also re-scores fresh snapshots between rounds
     if detection == "gate-fallback":
         # Rule-based ranking (not the learned model): GraphSAGE didn't flag
         # this incident, so PPO dispatches on gate deviation instead.
         raw_ranked = ranked = gate_ranking(telemetry, args.gate)
     else:
-        encoder, stats = load_checkpoint(args.graphsage_model)
-        base_scorer = GraphSAGEScorer(encoder, stats)
         raw_ranked = sorted(base_scorer.score_graph(incident), key=lambda s: s.rank)
         ranked = sorted(PriorityWeightedScorer(base_scorer).score_graph(incident), key=lambda s: s.rank)
     multi_fault_nodes = detect_multi_fault(ranked)
 
-    decision = PPODispatcher(policy=PPO.load(args.ppo_model)).choose(ranked, visited=set(), step=1)
+    dispatcher = PPODispatcher(policy=PPO.load(args.ppo_model), mask_visited=True)
+    decision = dispatcher.choose(ranked, visited=set(), step=1)
     top_service = decision.action.target_service
     dispatch = {
         "agent_type": decision.action.agent_type,
@@ -560,40 +564,41 @@ def run_pipeline(incident_dir: Path, telemetry: dict, ground_truth: Optional[dic
     publish(build_result(**common, fault_injection_state="active"))
     print(f"  {tag} interim result written to {args.output}; running agents...")
 
-    from pipeline import run_investigation
-    from schemas.contracts import DispatchAction
+    def investigate(target: str) -> dict:
+        inv = replay_demo.investigate_service(target, incident.incident_id, incident_dir, telemetry_path,
+                                              args.code_repo_path)
+        print(f"  {tag} report root cause: {inv['report'].get('root_cause_service')} "
+              f"(confidence {inv['report'].get('confidence_score')})")
+        return inv
 
-    log_path = incident_dir / f"{top_service}.log"
-    investigation = run_investigation(
-        [DispatchAction(agent_type=a, target_service=top_service) for a in ("log", "metrics", "code")],
-        incident_id=incident.incident_id,
-        telemetry_path=str(telemetry_path),
-        log_path=str(log_path) if log_path.exists() else None,
-        code_path=args.code_repo_path,
-    )
-    print(f"  {tag} report root cause: {investigation['report'].get('root_cause_service')} "
-          f"(confidence {investigation['report'].get('confidence_score')})")
+    investigation = investigate(top_service)
 
-    notifications, recovery = [], None
+    notifications, recovery, rounds = [], None, []
     if notifier is not None:
-        recovery = replay_demo._wait_for_shopmind(telemetry, args.recovery_timeout, args.recovery_interval,
-                                                  simulate=getattr(args, "simulate_recovery", None))
-        if recovery["recovered"]:
-            reported = investigation["report"].get("root_cause_service")
-            fresh = get_recipients()
-            notifications.append(notifier.notify_restored(
-                incident.incident_id, fresh["recipients"],
-                root_cause_service=reported if reported and reported != "unknown" else top_service,
-                started_at=replay_demo._fault_started_at(telemetry),
-                restored_at=recovery["restored_at"],
-                recipients_source=fresh["source"],
-            ))
-        else:
-            notifications.append(notifier.notify_not_recovered(
-                incident.incident_id, recovery["still_unhealthy"], args.recovery_timeout))
+        simulate = getattr(args, "simulate_recovery", None)
+        outcome = run_recovery_rounds(
+            top_service, investigation, ranked,
+            wait=lambda r: replay_demo._wait_for_shopmind(telemetry, args.recovery_timeout, args.recovery_interval,
+                                                          simulate=simulate, round_no=r),
+            rescore=lambda r: replay_demo.rescore_snapshot(replay_demo.fresh_snapshot(telemetry, simulate, r),
+                                                           telemetry, base_scorer),
+            choose=lambda rk, visited, step: dispatcher.choose(rk, visited=visited, step=step),
+            investigate=lambda target, r: investigate(target),
+            max_rounds=getattr(args, "max_rounds", 3),
+        )
+        recovery, rounds, investigation = outcome["recovery"], outcome["rounds"], outcome["investigation"]
+        if outcome["decision"] is not None:
+            d = outcome["decision"]
+            common.update(ranked=outcome["ranked"], multi_fault_nodes=detect_multi_fault(outcome["ranked"]),
+                          dispatch={"agent_type": d.action.agent_type, "target_service": d.action.target_service,
+                                    "policy_confidence": d.policy_confidence})
+        notifications = notify_rounds_outcome(
+            notifier, incident.incident_id, outcome, get_recipients,
+            replay_demo._fault_started_at(telemetry), args.recovery_timeout,
+        )
 
     state = "active" if (recovery is not None and not recovery.get("recovered")) else "resolved"
-    publish(build_result(**common, investigation=investigation, recovery=recovery,
+    publish(build_result(**common, investigation=investigation, recovery=recovery, rounds=rounds,
                          notifications=notifications, fault_injection_state=state))
     print(f"  {tag} final result written to {args.output} and {incident_dir / 'result.json'}")
 
@@ -630,6 +635,8 @@ def main() -> None:
     parser.add_argument("--recovery-interval", type=float, default=5.0)
     parser.add_argument("--simulate-recovery", choices=SCENARIOS, default=None,
                         help="Replace live recovery polling with a scripted trajectory (only with --notify)")
+    parser.add_argument("--max-rounds", type=int, default=3,
+                        help="Investigation rounds (re-score + PPO picks a new target) while recovery keeps failing")
     parser.add_argument("--once", action="store_true", help="Exit after the first incident finishes")
     parser.add_argument("--dry-run", action="store_true", help="Detect and log only: no files, no agents")
     parser.add_argument("--verbose", action="store_true")
