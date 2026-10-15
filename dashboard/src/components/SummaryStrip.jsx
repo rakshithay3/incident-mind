@@ -4,7 +4,7 @@ import { notifySummary, roundOutcome } from './CustomerNotification'
 // first five seconds: what broke, what IncidentMind blamed, how wide it is,
 // and whether shoppers were told it's fixed.
 
-export default function SummaryStrip({ incident }) {
+export default function SummaryStrip({ incident, isAdmin = false }) {
   const report = incident.report
   const anomalous = incident.nodes.filter(n => n.status === 'anomalous').length
   const multi = incident.multi_fault_detected?.length ?? 0
@@ -19,7 +19,7 @@ export default function SummaryStrip({ incident }) {
       <div className="stat">
         <div className="stat-label">Incident</div>
         <div className="stat-value mono">{incident.incident_id}</div>
-        <div className="stat-sub">{incident.fault_type ?? 'unknown fault'}</div>
+        {isAdmin && <div className="stat-sub">{incident.fault_type ?? 'unknown fault'}</div>}
       </div>
       <div className="stat">
         <div className="stat-label">Root cause</div>
@@ -40,7 +40,7 @@ export default function SummaryStrip({ incident }) {
           {anomalous}
           <span className="instance-muted"> / {incident.nodes.length}</span>
         </div>
-        <div className="stat-sub">{multi > 1 ? `multi-fault · ${multi} above threshold` : 'single fault'}</div>
+        <div className="stat-sub">{multi > 1 ? `${multi} services above threshold` : 'single source'}</div>
       </div>
       <div className="stat">
         <div className="stat-label">Customer email</div>

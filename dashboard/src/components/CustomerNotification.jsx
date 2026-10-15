@@ -82,7 +82,7 @@ export function notifySummary(incident) {
   return { label: s.label, cls: s.cls, sub }
 }
 
-export default function CustomerNotification({ incident }) {
+export default function CustomerNotification({ incident, isAdmin = false }) {
   const n = restoredNotification(incident)
   const recovery = incident.recovery
 
@@ -133,7 +133,7 @@ export default function CustomerNotification({ incident }) {
           {checks != null && <span>Health checks <strong>{checks}</strong></span>}
           {incident.rounds?.length > 1 && <span>Rounds <strong>{incident.rounds.length}</strong></span>}
           {d.recipients_source && <span>Users from <strong>{d.recipients_source}</strong></span>}
-          {recovery?.simulated && <span className="status-pill notify-skipped" title={`Scripted recovery scenario: ${recovery.simulated}`}>Simulated</span>}
+          {isAdmin && recovery?.simulated && <span className="status-pill notify-skipped" title={`Scripted recovery scenario: ${recovery.simulated}`}>Simulated</span>}
         </div>
       </div>
     </div>

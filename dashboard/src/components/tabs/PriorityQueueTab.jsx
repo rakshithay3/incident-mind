@@ -9,7 +9,7 @@ import { deriveSingleInstanceQueue } from '../../data/transformDemoResult'
 // Source: multiInstanceResult.json when present, otherwise the loaded
 // incident treated as a single instance.
 
-export default function PriorityQueueTab({ incident, multiInstance }) {
+export default function PriorityQueueTab({ incident, multiInstance, isAdmin = false }) {
   const data = useMemo(
     () => multiInstance ?? deriveSingleInstanceQueue(incident),
     [multiInstance, incident]
@@ -19,7 +19,7 @@ export default function PriorityQueueTab({ incident, multiInstance }) {
 
   return (
     <div className="tab-panel">
-      {data.source === 'single' && (
+      {isAdmin && data.source === 'single' && (
         <div className="wireframe-note">
           Single instance view, derived from the loaded incident. For the cross-instance
           queue run <span className="mono">cross_instance_dispatch_demo.py --output multi_instance_result.json</span> and
@@ -38,7 +38,7 @@ export default function PriorityQueueTab({ incident, multiInstance }) {
               </div>
               <div className="instance-card-body mono">
                 <div>{inst.incident_id ?? '—'}</div>
-                <div className="instance-muted">{inst.fault_type ?? 'unknown fault'}</div>
+                {isAdmin && <div className="instance-muted">{inst.fault_type ?? 'unknown fault'}</div>}
                 <div>
                   {inst.anomalous_count} anomalous · {dispatched} dispatched
                 </div>
