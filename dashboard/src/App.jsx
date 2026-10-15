@@ -79,7 +79,7 @@ export default function App() {
           >
             {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
           </button>
-          <FaultBeacon state={incident.fault_injection_state} />
+          <FaultBeacon state={incident.fault_injection_state} simulated={incident.recovery?.simulated} />
         </div>
       </header>
 

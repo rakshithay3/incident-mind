@@ -1,4 +1,4 @@
-import { notifySummary } from './CustomerNotification'
+import { notifySummary, roundOutcome } from './CustomerNotification'
 
 // Four headline numbers above the graph -- what a demo audience needs in the
 // first five seconds: what broke, what IncidentMind blamed, how wide it is,
@@ -10,6 +10,8 @@ export default function SummaryStrip({ incident }) {
   const multi = incident.multi_fault_detected?.length ?? 0
   const dispatch = incident.ppo_dispatch?.action
   const notify = notifySummary(incident)
+  const rounds = incident.rounds ?? []
+  const multiRound = rounds.length > 1
   const confidence = report ? `${Math.round(report.confidence_score * 100)}% confidence` : null
 
   return (
@@ -25,6 +27,12 @@ export default function SummaryStrip({ incident }) {
         <div className="stat-sub">
           {confidence ?? (dispatch ? `PPO sent ${dispatch.agent_type} agent · report pending` : 'no report yet')}
         </div>
+        {multiRound && (
+          <div className="stat-sub">
+            Round {rounds[rounds.length - 1].round ?? rounds.length} of {rounds.length} · Round 1 picked{' '}
+            <span className="mono">{rounds[0].target_service}</span> ({roundOutcome(rounds[0].recovery).replace('_', ' ')})
+          </div>
+        )}
       </div>
       <div className="stat">
         <div className="stat-label">Anomalous services</div>

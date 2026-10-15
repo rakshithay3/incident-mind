@@ -33,9 +33,22 @@ export function fmtDuration(sec) {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m`
 }
 
-function roundOutcome(recovery) {
+export function roundOutcome(recovery) {
   if (!recovery) return 'unknown'
   return recovery.recovered ? 'recovered' : (recovery.outcome ?? 'not_recovered')
+}
+
+// "41 (37 + 4)" across re-investigation rounds; just the count for one round.
+export function healthChecks(incident) {
+  const rounds = incident.rounds ?? []
+  if (rounds.length < 2) return incident.recovery?.polls ?? null
+  const polls = rounds.map(r => r.recovery?.polls ?? 0)
+  return `${polls.reduce((a, b) => a + b, 0)} (${polls.join(' + ')})`
+}
+
+// Why an email was drafted but not sent (notifier.py reason).
+function dryRunReason(n) {
+  return n.reason === 'SMTP credentials not set' ? 'no SMTP login set' : (n.reason ?? 'not sent')
 }
 
 // Re-investigation rounds: round 1 -> auth-service -> relapsed, ...
@@ -65,7 +78,7 @@ export function notifySummary(incident) {
   const s = NOTIFY_STATUS[n.status] ?? NOTIFY_STATUS.skipped
   let sub = n.reason ?? ''
   if (n.status === 'sent' || n.status === 'partial') sub = `${n.sent_count} of ${n.recipients_count} users`
-  if (n.status === 'dry_run') sub = `${n.recipients_count} drafted (no SMTP login)`
+  if (n.status === 'dry_run') sub = `${n.recipients_count} drafted (${dryRunReason(n)})`
   return { label: s.label, cls: s.cls, sub }
 }
 
@@ -94,12 +107,13 @@ export default function CustomerNotification({ incident }) {
   const d = n.details ?? {}
   const restored = fmtTime(d.restored_at ?? recovery?.restored_at)
   const outcome = recovery && !recovery.recovered ? RECOVERY_OUTCOME[recovery.outcome] : null
+  const checks = healthChecks(incident)
   const downtime = d.downtime_sec != null && d.downtime_sec <= 6 * 3600 ? fmtDuration(d.downtime_sec) : null
 
   let body
   if (n.status === 'sent') body = `Told ${n.sent_count} ShopMind user${n.sent_count === 1 ? '' : 's'} that ${d.affected_area ?? 'the site'} is working again.`
   else if (n.status === 'partial') body = `${n.sent_count} of ${n.recipients_count} emails went out. ${n.reason ?? ''}`
-  else if (n.status === 'dry_run') body = `${n.recipients_count} email${n.recipients_count === 1 ? '' : 's'} drafted to output/notifications/ (no SMTP login set).`
+  else if (n.status === 'dry_run') body = `${n.recipients_count} email${n.recipients_count === 1 ? '' : 's'} drafted to output/notifications/ (${dryRunReason(n)}).`
   else body = n.reason ?? 'Users were not emailed.'
 
   return (
@@ -116,7 +130,7 @@ export default function CustomerNotification({ incident }) {
           {restored && <span>Back to normal <strong>{restored}</strong></span>}
           {outcome && <span>Outcome <strong>{outcome}</strong></span>}
           {downtime && <span>Disruption <strong>{downtime}</strong></span>}
-          {recovery?.polls != null && <span>Health checks <strong>{recovery.polls}</strong></span>}
+          {checks != null && <span>Health checks <strong>{checks}</strong></span>}
           {incident.rounds?.length > 1 && <span>Rounds <strong>{incident.rounds.length}</strong></span>}
           {d.recipients_source && <span>Users from <strong>{d.recipients_source}</strong></span>}
           {recovery?.simulated && <span className="status-pill notify-skipped" title={`Scripted recovery scenario: ${recovery.simulated}`}>Simulated</span>}
