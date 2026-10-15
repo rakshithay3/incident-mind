@@ -132,6 +132,7 @@ def run_investigation(
     telemetry_path=None,
     log_path=None,
     code_path=None,
+    report_service=None,
 ):
     """
     Run the complete IncidentMind investigation pipeline.
@@ -156,6 +157,10 @@ def run_investigation(
 
     The optional telemetry_path/log_path/code_path arguments are
     retained for compatibility with existing tests and scripts.
+
+    report_service saves the report as
+    output/<incident_id>_<report_service>_report.json instead, so a
+    multi-fault run's extra per-service reports don't overwrite the main one.
     """
 
     # ---------------------------------------------------------
@@ -192,7 +197,10 @@ def run_investigation(
     output_dir = Path("output")
     output_dir.mkdir(exist_ok=True)
 
-    output_file = output_dir / f"{incident_id}_report.json"
+    if report_service:
+        output_file = output_dir / f"{incident_id}_{report_service}_report.json"
+    else:
+        output_file = output_dir / f"{incident_id}_report.json"
 
     import json
 

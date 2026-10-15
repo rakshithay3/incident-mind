@@ -573,7 +573,7 @@ def run_pipeline(incident_dir: Path, telemetry: dict, ground_truth: Optional[dic
 
     def investigate(target: str) -> dict:
         inv = replay_demo.investigate_service(target, incident.incident_id, incident_dir, telemetry_path,
-                                              args.code_repo_path)
+                                              args.code_repo_path, main=target == top_service)
         investigations[target] = inv
         print(f"  {tag} report root cause: {inv['report'].get('root_cause_service')} "
               f"(confidence {inv['report'].get('confidence_score')})")

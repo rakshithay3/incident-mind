@@ -152,8 +152,10 @@ def rescore_snapshot(snapshot, telemetry, base_scorer):
     return sorted(PriorityWeightedScorer(base_scorer).score_graph(graph), key=lambda s: s.rank)
 
 
-def investigate_service(target, incident_id, incident_dir, telemetry_path, code_path):
-    """Run the log/metrics/code agents + report on one target service."""
+def investigate_service(target, incident_id, incident_dir, telemetry_path, code_path, main=True):
+    """Run the log/metrics/code agents + report on one target service. The
+    main (PPO target's) report is saved as output/<incident_id>_report.json;
+    main=False saves it as output/<incident_id>_<target>_report.json."""
     from schemas.contracts import DispatchAction
     from pipeline import run_investigation
 
@@ -170,6 +172,7 @@ def investigate_service(target, incident_id, incident_dir, telemetry_path, code_
         telemetry_path=str(telemetry_path),
         log_path=str(log_path) if log_path.exists() else None,
         code_path=code_path,
+        report_service=None if main else target,
     )
 
 
@@ -256,7 +259,7 @@ def main() -> None:
 
     def investigate(target):
         investigations[target] = investigate_service(target, incident.incident_id, incident_dir, telemetry_path,
-                                                     args.code_repo_path)
+                                                     args.code_repo_path, main=target == top_service)
         return investigations[target]
 
     investigation = investigate(top_service)

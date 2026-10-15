@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -99,15 +100,22 @@ class BuildResultFaultReportsTest(unittest.TestCase):
 class ReplayDemoMultiFaultTest(unittest.TestCase):
     """replay_demo.main() end to end with the models and agents faked out."""
 
-    def _run(self, n_anomalous):
+    def _run(self, n_anomalous, files=None):
+        """files: if a dict, the real investigate_service runs (only the agents
+        and report LLM faked) in a temp cwd, and files gets output/'s reports."""
+        import pipeline
         import replay_demo
 
         scores = _scores(n_anomalous)
         calls = []
 
-        def investigate_service(target, *a):
+        def investigate_service(target, *a, **k):
             calls.append(target)
             return _inv(target)
+
+        def investigate_incident(actions, **k):
+            calls.append(actions[0].target_service)
+            return {"findings": [], "svc": actions[0].target_service}
 
         decision = DispatchDecision(step=1, action=DispatchAction(agent_type="log", target_service="auth-service"),
                                     policy_confidence=0.6)
@@ -118,6 +126,16 @@ class ReplayDemoMultiFaultTest(unittest.TestCase):
             out = Path(d) / "result.json"
             argv = ["replay_demo.py", "--incident-dir", d, "--output", str(out), "--no-notify"]
             scorer = SimpleNamespace(score_graph=lambda g: list(scores))
+            if files is None:
+                agents = mock.patch.object(replay_demo, "investigate_service", side_effect=investigate_service)
+            else:
+                agents = mock.patch.multiple(
+                    pipeline, investigate_incident=investigate_incident,
+                    generate_report=lambda b, incident_id: {"incident_id": incident_id,
+                                                            "root_cause_service": b["svc"], "confidence_score": 0.7})
+            cwd = os.getcwd()
+            os.chdir(d)
+            self.addCleanup(os.chdir, cwd)
             with mock.patch.object(sys, "argv", argv), \
                     mock.patch.object(replay_demo, "compile_live_snapshot",
                                       return_value=SimpleNamespace(incident_id="inc_mf", timestamp="t", nodes=[])), \
@@ -127,9 +145,11 @@ class ReplayDemoMultiFaultTest(unittest.TestCase):
                     mock.patch.object(replay_demo, "PPODispatcher",
                                       return_value=SimpleNamespace(choose=lambda *a, **k: decision)), \
                     mock.patch("stable_baselines3.PPO.load", return_value=None), \
-                    mock.patch.object(replay_demo, "investigate_service", side_effect=investigate_service), \
+                    agents, \
                     mock.patch("builtins.print"):
                 replay_demo.main()
+            if files is not None:
+                files.update({f.name: json.loads(f.read_text()) for f in (Path(d) / "output").glob("*_report.json")})
             return json.loads(out.read_text()), calls
 
     def test_dual_fault_writes_one_report_per_flagged_service(self):
@@ -138,6 +158,15 @@ class ReplayDemoMultiFaultTest(unittest.TestCase):
         self.assertEqual(result["report"]["root_cause_service"], "auth-service")
         self.assertEqual([(r["service"], r["report"]["root_cause_service"]) for r in result["fault_reports"]],
                          [("auth-service", "auth-service"), ("payment-service", "payment-service")])
+
+    def test_dual_fault_saves_each_report_to_its_own_file(self):
+        files = {}
+        result, calls = self._run(2, files)
+        self.assertEqual(calls, ["auth-service", "payment-service"])
+        self.assertEqual(set(files), {"inc_mf_report.json", "inc_mf_payment-service_report.json"})
+        self.assertEqual(files["inc_mf_report.json"]["root_cause_service"], "auth-service")  # PPO target's
+        self.assertEqual(files["inc_mf_payment-service_report.json"]["root_cause_service"], "payment-service")
+        self.assertEqual(result["report"]["root_cause_service"], "auth-service")
 
     def test_single_fault_has_no_fault_reports(self):
         result, calls = self._run(1)
