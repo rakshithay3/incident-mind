@@ -47,6 +47,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set
 
+from notifications.recovery_sim import SCENARIOS
 from shopmind_snapshot import baseline_stats, compile_telemetry, down_services, snapshot_score
 
 DEFAULT_OUTPUT = "dashboard/public/demoResult.json"
@@ -575,7 +576,8 @@ def run_pipeline(incident_dir: Path, telemetry: dict, ground_truth: Optional[dic
 
     notifications, recovery = [], None
     if notifier is not None:
-        recovery = replay_demo._wait_for_shopmind(telemetry, args.recovery_timeout, args.recovery_interval)
+        recovery = replay_demo._wait_for_shopmind(telemetry, args.recovery_timeout, args.recovery_interval,
+                                                  simulate=getattr(args, "simulate_recovery", None))
         if recovery["recovered"]:
             reported = investigation["report"].get("root_cause_service")
             fresh = get_recipients()
@@ -626,6 +628,8 @@ def main() -> None:
     parser.add_argument("--notify", action="store_true", help="Wait for recovery and email users (off by default)")
     parser.add_argument("--recovery-timeout", type=float, default=180.0)
     parser.add_argument("--recovery-interval", type=float, default=5.0)
+    parser.add_argument("--simulate-recovery", choices=SCENARIOS, default=None,
+                        help="Replace live recovery polling with a scripted trajectory (only with --notify)")
     parser.add_argument("--once", action="store_true", help="Exit after the first incident finishes")
     parser.add_argument("--dry-run", action="store_true", help="Detect and log only: no files, no agents")
     parser.add_argument("--verbose", action="store_true")

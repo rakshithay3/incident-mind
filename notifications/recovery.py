@@ -16,6 +16,10 @@ baseline_history):
 
 All app services are checked, not just the root cause: network_delay shows
 up on the caller, and users care whether the site works, not one service.
+
+On timeout the result's "outcome" says how it failed: "relapsed" (healthy at
+some point, then unhealthy again), "partial" (fewer unhealthy services than on
+the first poll) or "not_recovered" (no improvement, or telemetry down).
 """
 
 from __future__ import annotations
@@ -44,6 +48,21 @@ def baseline_means(baseline_history: Iterable[Dict]) -> Dict[str, Dict[str, floa
     return out
 
 
+def limits_for(b: Dict[str, float]) -> Dict[str, float]:
+    """Per-field "back near baseline" ceilings for one service's baseline means."""
+    return {
+        "error_rate": b.get("error_rate", 0.0) + 0.05,
+        "cpu_pct": max(1.5 * b.get("cpu_pct", 0.0), b.get("cpu_pct", 0.0) + 0.10),
+        "mem_pct": max(1.3 * b.get("mem_pct", 0.0), b.get("mem_pct", 0.0) + 0.10),
+        "p99_latency_ms": max(1.5 * b.get("p99_latency_ms", 0.0), b.get("p99_latency_ms", 0.0) + 100.0),
+    }
+
+
+def app_services_of(baseline: Dict[str, Dict[str, float]]) -> List[str]:
+    app = [sid for sid, b in baseline.items() if b.get("cpu_pct", 0.0) > 0 or b.get("p99_latency_ms", 0.0) > 0]
+    return app or list(baseline.keys())
+
+
 def unhealthy_services(nodes: Iterable[Dict], baseline: Dict[str, Dict[str, float]],
                        services: Optional[Iterable[str]] = None) -> List[str]:
     by_id = {n.get("service_id"): n for n in nodes}
@@ -55,13 +74,7 @@ def unhealthy_services(nodes: Iterable[Dict], baseline: Dict[str, Dict[str, floa
         if n is None or n.get("cpu_pct") is None:
             bad.append(sid)
             continue
-        limits = {
-            "error_rate": b.get("error_rate", 0.0) + 0.05,
-            "cpu_pct": max(1.5 * b.get("cpu_pct", 0.0), b.get("cpu_pct", 0.0) + 0.10),
-            "mem_pct": max(1.3 * b.get("mem_pct", 0.0), b.get("mem_pct", 0.0) + 0.10),
-            "p99_latency_ms": max(1.5 * b.get("p99_latency_ms", 0.0), b.get("p99_latency_ms", 0.0) + 100.0),
-        }
-        for f, limit in limits.items():
+        for f, limit in limits_for(b).items():
             v = n.get(f)
             if v is not None and float(v) > limit:
                 bad.append(sid)
@@ -81,26 +94,35 @@ def wait_for_recovery(
 ) -> Dict:
     """collect() returns the current list of telemetry nodes.
     Returns {"recovered": bool, "restored_at": iso|None, "polls": int,
-             "still_unhealthy": [...]}"""
+             "still_unhealthy": [...], "outcome": str, "relapses": int,
+             "best_streak": int}"""
     baseline = baseline_means(baseline_history)
-    app_services = [sid for sid, b in baseline.items() if b.get("cpu_pct", 0.0) > 0 or b.get("p99_latency_ms", 0.0) > 0]
-    if not app_services:
-        app_services = list(baseline.keys())
+    app_services = app_services_of(baseline)
 
     start = clock()
     streak, polls, bad = 0, 0, app_services
+    relapses, best_streak = 0, 0
+    first_bad: Optional[int] = None  # unhealthy count on the first real (non-error) poll
+    telemetry_error = False
     while True:
         polls += 1
         try:
             nodes = collect()
             bad = unhealthy_services(nodes, baseline, app_services)
+            telemetry_error = False
+            if first_bad is None:
+                first_bad = len(bad)
         except Exception as exc:  # telemetry down counts as not healthy
             bad = [f"telemetry error: {type(exc).__name__}"]
+            telemetry_error = True
         if bad:
+            if streak:
+                relapses += 1
             streak = 0
             log(f"  [recovery] poll {polls}: waiting on {', '.join(bad)}")
         else:
             streak += 1
+            best_streak = max(best_streak, streak)
             log(f"  [recovery] poll {polls}: all services healthy ({streak}/{consecutive})")
             if streak >= consecutive:
                 return {
@@ -108,7 +130,17 @@ def wait_for_recovery(
                     "restored_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                     "polls": polls,
                     "still_unhealthy": [],
+                    "outcome": "recovered",
+                    "relapses": relapses,
+                    "best_streak": best_streak,
                 }
         if clock() - start >= timeout_sec:
-            return {"recovered": False, "restored_at": None, "polls": polls, "still_unhealthy": bad}
+            if relapses:
+                outcome = "relapsed"
+            elif not telemetry_error and first_bad is not None and len(bad) < first_bad:
+                outcome = "partial"
+            else:
+                outcome = "not_recovered"
+            return {"recovered": False, "restored_at": None, "polls": polls, "still_unhealthy": bad,
+                    "outcome": outcome, "relapses": relapses, "best_streak": best_streak}
         sleep(interval_sec)

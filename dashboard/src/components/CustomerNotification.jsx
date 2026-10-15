@@ -13,6 +13,13 @@ export const NOTIFY_STATUS = {
   skipped: { label: 'Not sent', cls: 'skipped', title: 'Users not emailed' }
 }
 
+// recovery.outcome for a failed recovery (notifications/recovery.py)
+export const RECOVERY_OUTCOME = {
+  not_recovered: 'Not recovered',
+  partial: 'Partly recovered',
+  relapsed: 'Recovered, then relapsed'
+}
+
 function fmtTime(iso) {
   if (!iso) return null
   const d = new Date(iso)
@@ -60,6 +67,7 @@ export default function CustomerNotification({ incident }) {
   const s = NOTIFY_STATUS[n.status] ?? NOTIFY_STATUS.skipped
   const d = n.details ?? {}
   const restored = fmtTime(d.restored_at ?? recovery?.restored_at)
+  const outcome = recovery && !recovery.recovered ? RECOVERY_OUTCOME[recovery.outcome] : null
   const downtime = d.downtime_sec != null && d.downtime_sec <= 6 * 3600 ? fmtDuration(d.downtime_sec) : null
 
   let body
@@ -79,9 +87,11 @@ export default function CustomerNotification({ incident }) {
         <div className="notice-body">{body}</div>
         <div className="notice-meta">
           {restored && <span>Back to normal <strong>{restored}</strong></span>}
+          {outcome && <span>Outcome <strong>{outcome}</strong></span>}
           {downtime && <span>Disruption <strong>{downtime}</strong></span>}
           {recovery?.polls != null && <span>Health checks <strong>{recovery.polls}</strong></span>}
           {d.recipients_source && <span>Users from <strong>{d.recipients_source}</strong></span>}
+          {recovery?.simulated && <span className="status-pill notify-skipped" title={`Scripted recovery scenario: ${recovery.simulated}`}>Simulated</span>}
         </div>
       </div>
     </div>

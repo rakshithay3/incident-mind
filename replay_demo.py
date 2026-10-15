@@ -50,6 +50,7 @@ from multi_fault import detect_multi_fault
 from notifications.notifier import Notifier
 from notifications.recipients import get_recipients
 from notifications.recovery import wait_for_recovery
+from notifications.recovery_sim import SCENARIOS, simulate_recovery
 
 # Snapshot selection, crash encoding, unit conversion and edges come from
 # shopmind_snapshot.py -- the SAME label-free code that builds the
@@ -86,18 +87,22 @@ def _fault_started_at(telemetry):
     )
 
 
-def _wait_for_shopmind(telemetry, timeout_sec, interval_sec):
+def _wait_for_shopmind(telemetry, timeout_sec, interval_sec, simulate=None):
     """Poll live ShopMind telemetry until it's back near this incident's
     baseline. If ShopMind/export_metrics isn't available at all, report
     not-recovered rather than guessing -- users are only told it's fixed
-    when telemetry actually shows it."""
+    when telemetry actually shows it. simulate=<scenario> replays a scripted
+    trajectory (notifications/recovery_sim.py) instead of live telemetry."""
+    if simulate:
+        return simulate_recovery(simulate, telemetry, timeout_sec=timeout_sec, interval_sec=interval_sec)
     try:
         from export_metrics import collect_all_telemetry, load_services
         config = load_services()
     except (ImportError, SystemExit, Exception) as exc:
         print(f"  [recovery] live telemetry unavailable ({type(exc).__name__}), users not emailed")
         return {"recovered": False, "restored_at": None, "polls": 0,
-                "still_unhealthy": ["telemetry unavailable"]}
+                "still_unhealthy": ["telemetry unavailable"],
+                "outcome": "not_recovered", "relapses": 0, "best_streak": 0}
 
     def collect():
         nodes, _edges = collect_all_telemetry(config, 10)
@@ -121,6 +126,8 @@ def main() -> None:
     parser.add_argument("--recovery-timeout", type=float, default=180.0,
                         help="Seconds to wait for ShopMind to return to baseline before giving up on the user email")
     parser.add_argument("--recovery-interval", type=float, default=5.0)
+    parser.add_argument("--simulate-recovery", choices=SCENARIOS, default=None,
+                        help="Replace live recovery polling with a scripted trajectory (only with notifications on)")
     args = parser.parse_args()
 
     notifier = None if args.no_notify else Notifier()
@@ -211,7 +218,8 @@ def main() -> None:
     notifications, recovery = [], None
     if notifier is not None:
         print("[5/6] Waiting for ShopMind to return to normal before emailing users...")
-        recovery = _wait_for_shopmind(telemetry, args.recovery_timeout, args.recovery_interval)
+        recovery = _wait_for_shopmind(telemetry, args.recovery_timeout, args.recovery_interval,
+                                      simulate=args.simulate_recovery)
         if recovery["recovered"]:
             reported = investigation["report"].get("root_cause_service")
             affected = reported if reported and reported != "unknown" else top_service
