@@ -47,11 +47,13 @@ def run_recovery_rounds(
     Returns {"rounds", "recovered", "recovery", "investigation", "target",
     "decision" (None if round 1 was final), "ranked", "services_tried"}.
     Each rounds entry carries "ranking": the top-5 (service, score) the PPO
-    chose that round's target from (None for round 1, which wasn't re-scored)."""
+    chose that round's target from (round 1: the caller's initial GraphSAGE
+    ranking; later rounds: the re-scored one)."""
     visited: List[str] = [target]
     rounds: List[Dict[str, Any]] = []
     decision = None
-    ranking = None
+    ranked = sorted(ranked, key=lambda s: s.rank)
+    ranking = _top_ranking(ranked)
     round_no = 1
     while True:
         recovery = wait(round_no)

@@ -77,7 +77,9 @@ class Harness:
 class RoundsLoopTest(unittest.TestCase):
     def test_first_round_recovery_needs_no_reinvestigation(self):
         h = Harness(recover_on=1)
+        h.rescore = lambda r: self.fail("round 1 must not be re-scored")
         out = h.run()
+        self.assertEqual([r["service"] for r in out["rounds"][0]["ranking"]], SERVICES)
         self.assertTrue(out["recovered"])
         self.assertEqual(h.waits, [1])
         self.assertEqual(h.investigated, [])
@@ -136,7 +138,13 @@ class RoundsLoopTest(unittest.TestCase):
             "auth-service", {"report": {"root_cause_service": "auth-service"}}, _ranked(),
             wait=h.wait, rescore=h.rescore, choose=h.choose, investigate=h.investigate, log=logs.append,
         )
-        self.assertIsNone(out["rounds"][0]["ranking"])
+        self.assertEqual(out["rounds"][0]["ranking"], [
+            {"service": "auth-service", "score": 1.0},
+            {"service": "payment-service", "score": 0.9},
+            {"service": "order-service", "score": 0.8},
+            {"service": "cart-service", "score": 0.7},
+        ])
+        self.assertFalse(any(m.startswith("  [round 1] ranking") for m in logs))
         self.assertEqual(out["rounds"][1]["ranking"], [
             {"service": "order-service", "score": 1.0},
             {"service": "auth-service", "score": 0.9},
@@ -261,6 +269,9 @@ class ResultSchemaTest(unittest.TestCase):
                            recovery=rounds[-1]["recovery"], rounds=rounds)
         self.assertEqual([r["target_service"] for r in res["rounds"]], ["auth-service", "payment-service"])
         self.assertEqual(set(res["rounds"][0]), {"round", "target_service", "report_root_cause", "recovery", "ranking"})
+        for r in res["rounds"]:
+            self.assertTrue(r["ranking"])
+            self.assertEqual(set(r["ranking"][0]), {"service", "score"})
         self.assertEqual(build_result("inc", "t", [], [], [], {}, None)["rounds"], [])
 
 
