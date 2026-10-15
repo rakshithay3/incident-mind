@@ -220,5 +220,68 @@ class NotifierTest(unittest.TestCase):
         self.assertEqual(FakeSMTP.sent, [])
 
 
+class SimulatedRecoveryEmailTest(unittest.TestCase):
+    """A --simulate-recovery run must never reach real inboxes, even with
+    SMTP credentials configured."""
+
+    ENV = {"IM_SMTP_USER": "fake-bot@gmail.com", "IM_SMTP_PASSWORD": "fake-app-password"}
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.out = Path(self.tmp.name)
+        FakeSMTP.sent = []
+        FakeSMTP.fail_login = False
+        self.opened = []
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _factory(self, host, port):
+        self.opened.append((host, port))
+        return FakeSMTP(host, port)
+
+    def _simulated_run(self, notifier):
+        from notifications.recovery_sim import simulate_recovery
+        from notifications.rounds import notify_rounds_outcome
+
+        base = {"cpu_pct": 0.05, "mem_pct": 0.2, "error_rate": 0.0, "mean_latency_ms": 12.0, "p99_latency_ms": 40.0}
+        telemetry = {"target_service": "auth-service", "baseline_history": [
+            {"timestamp": f"t{i}", "nodes": [{"service_id": "auth-service", **base}], "edges": []} for i in range(3)]}
+        recovery = simulate_recovery("recovers", telemetry, timeout_sec=60, log=lambda m: None)
+        self.assertTrue(recovery["recovered"])
+        self.assertEqual(recovery["simulated"], "recovers")
+        outcome = {"recovered": True, "recovery": recovery, "rounds": [{"recovery": recovery}],
+                   "investigation": {"report": {"root_cause_service": "auth-service"}},
+                   "target": "auth-service", "services_tried": ["auth-service"]}
+        return notify_rounds_outcome(notifier, "sim_001", outcome,
+                                     lambda: {"recipients": RECIPIENTS, "source": "test"}, None, 60)
+
+    def test_simulated_run_sends_nothing_with_credentials_set(self):
+        cfg = NotificationConfig.from_env(self.ENV)
+        self.assertTrue(cfg.can_send)
+        n = Notifier(cfg, output_dir=self.out, smtp_factory=self._factory)
+        [entry] = self._simulated_run(n)
+        self.assertEqual(entry["status"], "dry_run")
+        self.assertEqual(entry["reason"], "simulated recovery")
+        self.assertEqual(entry["sent_count"], 0)
+        self.assertEqual(entry["details"]["simulated"], "recovers")
+        self.assertEqual(self.opened, [])  # no SMTP connection at all
+        self.assertEqual(FakeSMTP.sent, [])
+        self.assertEqual(len(list(self.out.glob("*.eml"))), 2)
+        logged = json.loads((self.out / "log.jsonl").read_text().splitlines()[-1])
+        self.assertEqual((logged["status"], logged["reason"]), ("dry_run", "simulated recovery"))
+
+    def test_allow_simulated_email_overrides(self):
+        n = Notifier(NotificationConfig.from_env(self.ENV), output_dir=self.out, smtp_factory=self._factory,
+                     allow_simulated_email=True)
+        [entry] = self._simulated_run(n)
+        self.assertEqual(entry["status"], "sent")
+        self.assertEqual(len(FakeSMTP.sent), 2)
+
+    def test_live_recovery_still_sends(self):
+        n = Notifier(NotificationConfig.from_env(self.ENV), output_dir=self.out, smtp_factory=self._factory)
+        self.assertEqual(n.notify_restored("live_001", RECIPIENTS)["status"], "sent")
+
+
 if __name__ == "__main__":
     unittest.main()

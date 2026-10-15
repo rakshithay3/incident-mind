@@ -525,7 +525,7 @@ def run_pipeline(incident_dir: Path, telemetry: dict, ground_truth: Optional[dic
         from notifications.notifier import Notifier
         from notifications.recipients import get_recipients
 
-        notifier = Notifier()
+        notifier = Notifier(allow_simulated_email=getattr(args, "allow_simulated_email", False))
         recipients_info = get_recipients()
         print(f"  [{telemetry['incident_id']}] users to notify on recovery: {len(recipients_info['recipients'])}")
 
@@ -635,6 +635,8 @@ def main() -> None:
     parser.add_argument("--recovery-interval", type=float, default=5.0)
     parser.add_argument("--simulate-recovery", choices=SCENARIOS, default=None,
                         help="Replace live recovery polling with a scripted trajectory (only with --notify)")
+    parser.add_argument("--allow-simulated-email", action="store_true",
+                        help="Really email users after a --simulate-recovery run (default: .eml drafts only)")
     parser.add_argument("--max-rounds", type=int, default=3,
                         help="Investigation rounds (re-score + PPO picks a new target) while recovery keeps failing")
     parser.add_argument("--once", action="store_true", help="Exit after the first incident finishes")

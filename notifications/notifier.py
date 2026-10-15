@@ -8,7 +8,10 @@ and live telemetry confirms ShopMind is back to normal
 details, scores or internal service names -- it's written for shoppers.
 
 Backend is stdlib smtplib. If SMTP credentials are missing, it runs in
-DRY-RUN mode and writes the emails to output/notifications/ instead.
+DRY-RUN mode and writes the emails to output/notifications/ instead. A
+simulated recovery (--simulate-recovery) is always DRY-RUN too, even with
+credentials set, unless the Notifier was built with allow_simulated_email
+(--allow-simulated-email) -- real users must not hear about a fake fix.
 Best-effort: never raises. Each call returns a status dict (also appended to
 output/notifications/log.jsonl) that replay_demo.py puts in demo_result.json
 for the dashboard. The status dict holds counts only, never addresses.
@@ -141,8 +144,9 @@ def build_restored_email(name: str, area: str, started_at: Optional[str], restor
 
 class Notifier:
     def __init__(self, config: Optional[NotificationConfig] = None, output_dir: Path = DEFAULT_OUTPUT_DIR,
-                 smtp_factory=None):
+                 smtp_factory=None, allow_simulated_email: bool = False):
         self.config = config or NotificationConfig.from_env()
+        self.allow_simulated_email = allow_simulated_email
         self.output_dir = Path(output_dir)
         self._smtp_factory = smtp_factory  # injectable for tests
         self._sent_incidents = set()
@@ -156,7 +160,10 @@ class Notifier:
         started_at: Optional[str] = None,
         restored_at: Optional[str] = None,
         recipients_source: Optional[str] = None,
+        simulated: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """simulated: the recovery_sim scenario name when the recovery being
+        reported was scripted rather than observed; forces dry-run."""
         cfg = self.config
         area = affected_area(root_cause_service)
         details = {
@@ -173,6 +180,8 @@ class Notifier:
                 details["downtime_sec"] = max(0, int((b - a).total_seconds()))
             except (ValueError, TypeError):
                 pass
+        if simulated:
+            details["simulated"] = simulated
 
         if not cfg.enabled:
             return self._record(incident_id, "skipped", details, 0, 0, reason="notifications disabled")
@@ -197,6 +206,11 @@ class Notifier:
             msg.add_alternative(content["html"], subtype="html")
             messages.append(msg)
 
+        if simulated and not self.allow_simulated_email:
+            self._write_dry_run(incident_id, messages)
+            self._sent_incidents.add(incident_id)
+            return self._record(incident_id, "dry_run", details, len(messages), 0,
+                                reason="simulated recovery", file=str(self.output_dir))
         if not cfg.can_send:
             self._write_dry_run(incident_id, messages)
             self._sent_incidents.add(incident_id)

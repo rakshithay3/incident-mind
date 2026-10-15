@@ -101,7 +101,8 @@ def notify_rounds_outcome(
 ) -> List[Dict[str, Any]]:
     """Exactly one notification entry: the "back to normal" email if some
     round recovered, otherwise one not-recovered record naming every service
-    tried."""
+    tried. A simulated recovery is passed through so the notifier only writes
+    .eml drafts."""
     if outcome["recovered"]:
         reported = (outcome["investigation"].get("report") or {}).get("root_cause_service")
         fresh = get_recipients()  # pick up anyone who registered meanwhile
@@ -111,6 +112,7 @@ def notify_rounds_outcome(
             started_at=started_at,
             restored_at=outcome["recovery"]["restored_at"],
             recipients_source=fresh["source"],
+            simulated=outcome["recovery"].get("simulated"),
         )]
     return [notifier.notify_not_recovered(
         incident_id, outcome["recovery"]["still_unhealthy"], timeout_sec * len(outcome["rounds"]),

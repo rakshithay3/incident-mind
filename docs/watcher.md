@@ -111,6 +111,7 @@ it restarts), so pod_crash incidents normally record `"unavailable"`.
 | `--output` | `dashboard/public/demoResult.json` | |
 | `--out-dir` | `output/watcher` | per-incident telemetry, logs, result |
 | `--notify` | off | wait for recovery and email users, as replay_demo.py |
+| `--allow-simulated-email` | off | really email users after a `--simulate-recovery` run (otherwise `.eml` drafts only) |
 | `--once` | off | exit after the first incident finishes |
 | `--dry-run` | off | detect and log only |
 | `--verbose` | off | print the gate every poll |

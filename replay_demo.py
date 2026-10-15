@@ -189,9 +189,11 @@ def main() -> None:
                         help="Replace live recovery polling with a scripted trajectory (only with notifications on)")
     parser.add_argument("--max-rounds", type=int, default=3,
                         help="Investigation rounds (re-score + PPO picks a new target) while recovery keeps failing")
+    parser.add_argument("--allow-simulated-email", action="store_true",
+                        help="Really email users after a --simulate-recovery run (default: .eml drafts only)")
     args = parser.parse_args()
 
-    notifier = None if args.no_notify else Notifier()
+    notifier = None if args.no_notify else Notifier(allow_simulated_email=args.allow_simulated_email)
 
     incident_dir = Path(args.incident_dir)
     telemetry_path = incident_dir / "telemetry_series.json"
